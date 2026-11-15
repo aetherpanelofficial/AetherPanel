@@ -1,0 +1,13 @@
+node_modules/
+build/
+dist/
+coverage/
+.DS_Store
+*.log
+.env*
+.cache/
+.vite/
+.tmp/
+temp/
+data/backups/aetherpanel_pre_update_*.json
+data/backups/db-snapshot.json

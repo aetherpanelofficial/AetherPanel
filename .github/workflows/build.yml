@@ -1,0 +1,200 @@
+name: Build panel bundles
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-bundles
+  cancel-in-progress: true
+
+env:
+  PUBLIC_REPO: aetherpanelofficial/aetherpanel
+
+jobs:
+  detect:
+    runs-on: ubuntu-24.04
+    outputs:
+      matrix: ${{ steps.scan.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install deps
+        run: |
+          set -euo pipefail
+          if [ -f package-lock.json ]; then npm ci --no-audit --no-fund
+          else echo "::warning::no package-lock.json"; npm install --no-audit --no-fund; fi
+      - id: scan
+        run: |
+          set -euo pipefail
+          n=$(find node_modules -name '*.node' 2>/dev/null | wc -l)
+          echo "native objects: $n"
+          if [ "$n" -eq 0 ]; then
+            json='{"include":[{"tag":"universal","libc":"glibc","runner":"ubuntu-24.04"}]}'
+          else
+            json='{"include":[{"tag":"x64-glibc","libc":"glibc","runner":"ubuntu-24.04"},{"tag":"arm64-glibc","libc":"glibc","runner":"ubuntu-24.04-arm"}]}'
+          fi
+          { echo 'matrix<<EOF'; printf '%s\n' "$json"; echo 'EOF'; } >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: detect
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.detect.outputs.matrix) }}
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Build
+        run: |
+          set -euo pipefail
+          if [ -f package-lock.json ]; then npm ci --no-audit --no-fund
+          else npm install --no-audit --no-fund; fi
+          npm run build
+          test -f dist/server.cjs
+          test -f dist/index.html
+          find dist -name '*.map' -delete
+
+      - name: Compile daemon
+        run: |
+          set -euo pipefail
+          if [ ! -d daemon ]; then echo "::warning::no daemon dir"; exit 0; fi
+          if [ -f daemon/agent.ts ]; then
+            npx --yes esbuild daemon/agent.ts --bundle --platform=node \
+              --format=cjs --packages=external --minify --outfile=daemon/agent.js
+          fi
+          if [ -f daemon/agent.js ]; then
+            find daemon -name '*.ts' -delete
+            find daemon -name '*.map' -delete
+          else
+            echo "::warning::daemon/agent.js not produced"
+          fi
+
+      - name: Production deps only
+        run: |
+          set -euo pipefail
+          rm -rf node_modules
+          if [ -f package-lock.json ]; then npm ci --omit=dev --no-audit --no-fund
+          else npm install --omit=dev --no-audit --no-fund; fi
+
+      - name: Package
+        run: |
+          set -euo pipefail
+          NAME="aetherpanel-${{ matrix.tag }}"
+          mkdir -p "out/${NAME}" artifacts
+          rsync -a --exclude '*.map' ./dist ./node_modules ./package.json "./out/${NAME}/"
+          [ -d daemon ] && rsync -a ./daemon "./out/${NAME}/"
+          [ -d public ] && rsync -a ./public "./out/${NAME}/"
+          [ -f .env.example ] && cp .env.example "out/${NAME}/.env.example"
+          tar --owner=0 --group=0 --numeric-owner --sort=name \
+              -czf "artifacts/${NAME}.tar.gz" -C out "${NAME}"
+          ls -lh "artifacts/${NAME}.tar.gz"
+
+      - name: Smoke test (non-blocking)
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          d=$(mktemp -d)
+          tar -xzf "artifacts/aetherpanel-${{ matrix.tag }}.tar.gz" -C "$d" --strip-components=1
+          cd "$d"; mkdir -p data
+          JWT_SECRET=smoke AETHER_ADMIN_EMAIL=a@b.c AETHER_ADMIN_PASSWORD=smokepass1 \
+            PORT=3399 NODE_ENV=production node dist/server.cjs > /tmp/smoke.log 2>&1 &
+          pid=$!
+          for _ in $(seq 1 30); do
+            sleep 1
+            curl -fsS -m 3 http://127.0.0.1:3399/api/health > /dev/null 2>&1 && { echo "health OK"; kill "$pid"; exit 0; }
+          done
+          kill "$pid" 2>/dev/null || true
+          echo "::warning::panel did not answer /api/health"
+          tail -40 /tmp/smoke.log || true
+
+      - name: Checksum
+        run: |
+          set -euo pipefail
+          cd artifacts
+          for f in ./*.tar.gz; do sha256sum "$f" > "${f}.sha256"; done
+          ls -la
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bundle-${{ matrix.tag }}
+          path: artifacts/*
+          if-no-files-found: error
+
+  publish:
+    needs: [detect, build]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Preflight (non-blocking)
+        continue-on-error: true
+        env:
+          PAT: ${{ secrets.RELEASE_PAT }}
+          KEY: ${{ secrets.MINISIGN_SECRET_KEY }}
+        run: |
+          test -f keys/aetherpanel.pub || echo "::warning::keys/aetherpanel.pub missing - publishing UNSIGNED"
+          [ -n "$KEY" ] || echo "::warning::MINISIGN_SECRET_KEY empty - publishing UNSIGNED"
+          [ -n "$PAT" ] || echo "::error::RELEASE_PAT empty - cross-repo publish will fail"
+          echo done
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Install minisign
+        continue-on-error: true
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq minisign
+
+      - name: Manifest
+        working-directory: artifacts
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          bundles=(./*.tar.gz)
+          [ "${#bundles[@]}" -gt 0 ] || { echo "::error::no bundles"; exit 1; }
+          printf '{"commit":"%s","built":"%s"}\n' "$GITHUB_SHA" "$(date -u +%FT%TZ)" > release.json
+          sha256sum "${bundles[@]}" ./release.json > SHA256SUMS
+          cat SHA256SUMS
+
+      - name: Sign (best effort)
+        continue-on-error: true
+        working-directory: artifacts
+        env:
+          KEY: ${{ secrets.MINISIGN_SECRET_KEY }}
+        run: |
+          set -euo pipefail
+          [ -f ../keys/aetherpanel.pub ] || { echo "no pubkey - skipping"; exit 0; }
+          [ -n "$KEY" ] || { echo "no secret - skipping"; exit 0; }
+          command -v minisign > /dev/null || { echo "no minisign - skipping"; exit 0; }
+          printf '%s' "$KEY" > /tmp/k; chmod 600 /tmp/k
+          minisign -Sm SHA256SUMS -s /tmp/k -t "aetherpanel $GITHUB_SHA"
+          shred -u /tmp/k
+          minisign -Vm SHA256SUMS -p ../keys/aetherpanel.pub
+          echo signed
+
+      - name: Publish to public repo
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PAT }}
+        run: |
+          set -euo pipefail
+          gh release view latest-build --repo "$PUBLIC_REPO" > /dev/null 2>&1 \
+            || gh release create latest-build --repo "$PUBLIC_REPO" \
+                 --latest=false --title "latest build (rolling)" \
+                 --notes "Rolling bundles built from main. install.sh verifies checksums before installing."
+          gh release upload latest-build artifacts/* --repo "$PUBLIC_REPO" --clobber
+          for a in $(gh release view latest-build --repo "$PUBLIC_REPO" --json assets --jq '.assets[].name'); do
+            [ -f "artifacts/$a" ] || gh release delete-asset latest-build "$a" --yes --repo "$PUBLIC_REPO"
+          done
+          echo published

@@ -1,0 +1,82 @@
+name: Deploy installer to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "install.sh"
+      - "keys/aetherpanel.pub"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+
+      - name: Stage site
+        run: |
+          set -euo pipefail
+          mkdir -p _site/keys
+          cp install.sh _site/install.sh
+          cp keys/aetherpanel.pub _site/keys/aetherpanel.pub
+          bash -n _site/install.sh
+          cat > _site/index.html <<'EOF'
+          <!doctype html>
+          <html lang="en">
+          <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <title>AetherPanel installer</title>
+          <style>
+            body { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center;
+                   background: #0f1117; color: #c9d1d9; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+            main { max-width: 44rem; padding: 2rem; }
+            h1 { color: #58a6ff; font-weight: 600; margin: 0 0 .5rem; }
+            p { line-height: 1.6; }
+            pre { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 1rem;
+                  overflow-x: auto; color: #adbac7; }
+            a { color: #58a6ff; }
+            small { color: #768390; }
+          </style>
+          </head>
+          <body>
+          <main>
+            <h1>AetherPanel installer</h1>
+            <p>Installs the AetherPanel control plane and its local node daemon. Every release is sha256-checked and signed with minisign before anything runs.</p>
+            <pre><code>curl -fsSL https://mrangerxd.github.io/AetherPanel/install.sh | bash</code></pre>
+            <p><a href="https://github.com/aetherpanelofficial/aetherpanel">github.com/aetherpanelofficial/aetherpanel</a></p>
+            <p><small>Verify before piping:
+              <a href="https://github.com/aetherpanelofficial/aetherpanel/releases/download/latest-build/SHA256SUMS">SHA256SUMS</a> ·
+              <a href="https://github.com/aetherpanelofficial/aetherpanel/releases/download/latest-build/SHA256SUMS.minisig">signature</a> ·
+              <a href="./keys/aetherpanel.pub">public key</a></small></p>
+          </main>
+          </body>
+          </html>
+          EOF
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-24.04
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

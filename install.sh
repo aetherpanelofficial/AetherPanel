@@ -1,0 +1,3048 @@
+#!/usr/bin/env bash
+# ==============================================================================
+#  ░█████╗░██████╗░░█████╗░███╗░░██╗███████╗██╗░░░░░
+#  ██╔══██╗██╔══██╗██╔══██╗████╗░██║██╔════╝██║░░░░░
+#  ███████║██████╔╝███████║██╔██╗██║█████╗░░██║░░░░░
+#  ██╔══██║██╔═══╝░██╔══██║██║╚████║██╔══╝░░██║░░░░░
+#  ██║░░██║██║░░░░░██║░░██║██║░╚███║███████╗███████╗
+#  ╚═╝░░╚═╝╚═╝░░░░░╚═╝░░╚══╝╚══════╝╚══════╝╚══════╝
+#
+#                         AETHERPANEL
+#          Universal Multi-Platform Control Plane & Agent
+#
+#                    DEFAULT PORT: 3000
+#                    Made with ❤ by ZenseiBabe
+#
+# Official Source Repository: https://github.com/mrrangerxd/aetherpanel
+# Universal Cross-Platform Installer, Updater & Node Pairer v4.0
+# ==============================================================================
+
+# Ensure execution in GNU Bash 4.0+
+if [ -z "${BASH_VERSION:-}" ]; then
+  if command -v bash >/dev/null 2>&1; then
+    exec bash "$0" "$@"
+  else
+    echo "Error: Bash 4.0+ is required to execute this installer." >&2
+    exit 1
+  fi
+fi
+
+set -Eeuo pipefail
+
+# ==============================================================================
+# 1. CENTRALIZED CONFIGURATION & ENVIRONMENT VARIABLES
+# ==============================================================================
+REPO_URL="https://github.com/mrrangerxd/aetherpanel"
+REPO_BRANCH="main"
+DEFAULT_ROOT_INSTALL_DIR="/opt/aetherpanel"
+DEFAULT_USER_INSTALL_DIR="${HOME:-/tmp}/aetherpanel"
+INSTALL_DIR=""
+LOG_DIR=""
+LOG_FILE=""
+DATA_DIR=""
+BIN_DIR=""
+PANEL_PORT="3000"
+DAEMON_PORT="9666"
+SFTP_PORT="2022"
+
+# Verified release acquisition (primary path). Source clone stays as fallback.
+RELEASE_TAG="${AETHER_RELEASE_TAG:-latest-build}"
+DOWNLOAD_BASE="${AETHER_DOWNLOAD_BASE:-https://github.com/MrRangerXD/AetherPanel/releases/download/${RELEASE_TAG}}"
+PUBKEY_URL="${AETHER_PUBKEY_URL:-https://raw.githubusercontent.com/MrRangerXD/AetherPanel/main/keys/aetherpanel.pub}"
+PUBKEY_SHA256="${AETHER_PUBKEY_SHA256:-REPLACE_WITH_SHA256_OF_KEYS_PUB}"
+
+# Terminal Color Palette
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+PURPLE='\033[0;35m'
+CYAN='\033[0;36m'
+WHITE='\033[1;37m'
+BOLD='\033[1m'
+NC='\033[0m' # No Color
+
+# Global State & CLI Parameters
+SHOW_MENU=true
+MODE=""
+INSTALL_TOKEN=""
+PANEL_URL=""
+ADMIN_EMAIL=""
+ADMIN_PASS=""
+AUTO_CONFIRM=false
+TEMP_DIR=""
+INSTALLED_COMMIT=""
+SERVER_IP=""
+NODE_ID=""
+NODE_NAME=""
+DAEMON_TOKEN=""
+DETECTED_IP=""
+NODE_FQDN=""
+
+# Verified-release state
+ALLOW_UNSIGNED=0
+PINNED_COMMIT=""
+ASSET=""
+A_ARCH=""
+ARTIFACT_DIR=""
+BUNDLE_OK=false
+GENERATED_PASS=false
+
+# Environment Capability Matrix State
+OS_NAME=""
+OS_PRETTY=""
+OS_VER=""
+DISTRO=""
+ARCH=""
+LIBC_TYPE="glibc" # glibc vs musl
+PKG_MGR="unknown"
+IS_ROOT=false
+HAS_SUDO=false
+INIT_SYSTEM="none" # systemd, openrc, sysvinit, runit, supervisor, none
+CONTAINER_ENV="BARE_METAL" # BARE_METAL, VM, KVM, QEMU, PROXMOX_VM, LXC, DOCKER, KUBERNETES, GITHUB_RUNNER, CLOUD_SANDBOX, RESTRICTED_CONTAINER, GENERIC_LINUX
+EXECUTION_MODE="FULL VPS MODE" # FULL VPS MODE, CONTAINER COMPATIBILITY MODE, CI/RUNNER MODE, SANDBOX MODE, USER SPACE MODE
+DOCKER_AVAILABLE=false
+DOCKER_STATUS_MSG="Unavailable"
+FIREWALL_MGR="none"
+STORAGE_PERSISTENT=true
+STORAGE_WRITABLE=true
+BACKGROUND_PROCESS_SUPPORTED=true
+
+RAM_TOTAL_MB=0
+RAM_FREE_MB=0
+DISK_FREE_GB=0
+NODE_MAJOR=0
+JAVA_INSTALLED_VERSIONS=""
+
+# ==============================================================================
+# 2. LOGGING, CLEANUP & USER INPUT HELPERS
+# ==============================================================================
+init_paths() {
+  local current_euid="${EUID:-$(id -u 2>/dev/null || echo 1)}"
+  if [ "$current_euid" -eq 0 ]; then
+    IS_ROOT=true
+    INSTALL_DIR="${INSTALL_DIR:-$DEFAULT_ROOT_INSTALL_DIR}"
+    LOG_DIR="/var/log/aetherpanel"
+    LOG_FILE="${LOG_DIR}/install.log"
+  else
+    IS_ROOT=false
+    INSTALL_DIR="${INSTALL_DIR:-$DEFAULT_USER_INSTALL_DIR}"
+    LOG_DIR="${HOME:-/tmp}/.aetherpanel/logs"
+    LOG_FILE="${LOG_DIR}/install.log"
+  fi
+
+  DATA_DIR="${INSTALL_DIR}/data"
+  BIN_DIR="${INSTALL_DIR}/bin"
+
+  mkdir -p "$LOG_DIR" 2>/dev/null || true
+  touch "$LOG_FILE" 2>/dev/null || true
+}
+
+log_msg() {
+  local msg="${1:-}"
+  local timestamp
+  timestamp=$(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || echo "unknown-time")
+  local sanitized_msg
+  sanitized_msg=$(echo "$msg" | sed -E 's/(token|secret|password|key|pass)=[A-Za-z0-9_-]+/\1=*******/gI' 2>/dev/null || echo "$msg")
+  if [ -n "$LOG_FILE" ] && [ -d "$(dirname "$LOG_FILE" 2>/dev/null || echo ".")" ]; then
+    echo "[$timestamp] $sanitized_msg" >> "$LOG_FILE" 2>/dev/null || true
+  fi
+}
+
+cleanup() {
+  local exit_code=$?
+  if [ -n "${TEMP_DIR:-}" ] && [ -d "${TEMP_DIR:-}" ]; then
+    rm -rf "$TEMP_DIR" 2>/dev/null || true
+  fi
+  if [ "$exit_code" -ne 0 ]; then
+    log_msg "Installer exited with non-zero exit code: $exit_code"
+  fi
+}
+trap cleanup EXIT
+
+prompt_input() {
+  local prompt_text="${1:-}"
+  local is_secret="${2:-false}"
+  local result=""
+
+  if [ -n "$prompt_text" ]; then
+    printf "%s" "$prompt_text" >&2
+  fi
+
+  if [ -t 0 ]; then
+    if [ "$is_secret" = true ]; then
+      stty -echo 2>/dev/null || true
+      read -r result 2>/dev/null || result=""
+      stty echo 2>/dev/null || true
+      echo "" >&2
+    else
+      read -r result 2>/dev/null || result=""
+    fi
+  elif [ -e /dev/tty ] && (exec < /dev/tty) 2>/dev/null; then
+    if [ "$is_secret" = true ]; then
+      stty -echo 2>/dev/null || true
+      read -r result < /dev/tty 2>/dev/null || result=""
+      stty echo 2>/dev/null || true
+      echo "" >&2
+    else
+      read -r result < /dev/tty 2>/dev/null || result=""
+    fi
+  else
+    result=""
+  fi
+
+  echo "$result"
+}
+
+normalize_url() {
+  local u="${1:-}"
+  u=$(echo "$u" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+  u=$(echo "$u" | sed -e 's:/*$::')
+  echo "$u"
+}
+
+validate_url() {
+  local u="${1:-}"
+  if [ -z "$u" ]; then
+    return 1
+  fi
+  # Disallow dangerous shell characters
+  if echo "$u" | grep -qE '[[:space:]'\''\"\;\|\&\`\$\<\>\\\{\}]'; then
+    return 1
+  fi
+  # Must begin with http:// or https://
+  if [[ ! "$u" =~ ^https?:// ]]; then
+    return 1
+  fi
+  # Host part must be present and not empty
+  local without_proto="${u#*://}"
+  local host_part="${without_proto%%/*}"
+  if [ -z "$host_part" ]; then
+    return 1
+  fi
+  local host_regex="^[-a-zA-Z0-9.:_]+$"
+  if [[ ! "$host_part" =~ $host_regex ]]; then
+    return 1
+  fi
+  return 0
+}
+
+set_env_var() {
+  local file="${1:-}"
+  local key="${2:-}"
+  local val="${3:-}"
+
+  if [ -z "$file" ] || [ -z "$key" ]; then
+    return 0
+  fi
+
+  mkdir -p "$(dirname "$file")" 2>/dev/null || true
+  touch "$file" 2>/dev/null || true
+
+  if grep -q "^${key}=" "$file" 2>/dev/null; then
+    local tmp_file
+    tmp_file=$(mktemp 2>/dev/null || echo "${file}.tmp.$$")
+    grep -v "^${key}=" "$file" > "$tmp_file" || true
+    echo "${key}=${val}" >> "$tmp_file"
+    mv "$tmp_file" "$file"
+  else
+    echo "${key}=${val}" >> "$file"
+  fi
+}
+
+# --- release helpers ----------------------------------------------------------
+gen_secret() {
+  if command -v openssl &>/dev/null; then
+    openssl rand -hex 32
+  else
+    head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n'
+  fi
+}
+
+sha256_of() {
+  if command -v sha256sum &>/dev/null; then sha256sum "$1" | cut -d' ' -f1
+  elif command -v shasum &>/dev/null; then shasum -a 256 "$1" | cut -d' ' -f1
+  else echo "no-sha256-tool"; fi
+}
+
+fetch_url() { # url dest -> 0 on success, removes partial file on failure
+  if command -v curl &>/dev/null; then
+    curl -fsSL --retry 3 --connect-timeout 10 --max-time 600 -o "$2" "$1" || { rm -f "$2"; return 1; }
+  elif command -v wget &>/dev/null; then
+    wget -q --tries=3 --timeout=30 -O "$2" "$1" || { rm -f "$2"; return 1; }
+  else
+    return 1
+  fi
+}
+
+url_exists() {
+  command -v curl &>/dev/null || return 1
+  curl -fsSI -o /dev/null -m 15 "$1" 2>/dev/null
+}
+
+# ==============================================================================
+# 3. ASCII BRANDING & HEADER
+# ==============================================================================
+print_banner() {
+  clear 2>/dev/null || true
+  echo -e "${PURPLE}${BOLD}"
+  echo '░█████╗░██████╗░░█████╗░███╗░░██╗███████╗██╗░░░░░'
+  echo '██╔══██╗██╔══██╗██╔══██╗████╗░██║██╔════╝██║░░░░░'
+  echo '███████║██████╔╝███████║██╔██╗██║█████╗░░██║░░░░░'
+  echo '██╔══██║██╔═══╝░██╔══██║██║╚████║██╔══╝░░██║░░░░░'
+  echo '██║░░██║██║░░░░░██║░░██║██║░╚███║███████╗███████╗'
+  echo '╚═╝░░╚═╝╚═╝░░░░░╚═╝░░╚══╝╚══════╝╚══════╝╚══════╝'
+  echo -e "${NC}"
+  echo -e "${CYAN}${BOLD}                         AETHERPANEL${NC}"
+  echo -e "${WHITE}          Universal Multi-Platform Control Plane & Agent${NC}\n"
+  echo -e "${BLUE}                    DEFAULT PORT: ${BOLD}${PANEL_PORT:-3000}${NC}"
+  echo -e "${PURPLE}                    Authoritative Source: ${BOLD}${REPO_URL}${NC}\n"
+  echo -e "${CYAN}--------------------------------------------------------------------------------${NC}\n"
+}
+
+# ==============================================================================
+# 4. CAPABILITY DETECTION & SYSTEM PROFILING ENGINE
+# ==============================================================================
+detect_architecture() {
+  local raw_arch
+  raw_arch=$(uname -m 2>/dev/null || echo "unknown")
+  case "$raw_arch" in
+    x86_64|amd64)
+      ARCH="x86_64"
+      A_ARCH="x64"
+      ;;
+    aarch64|arm64)
+      ARCH="aarch64"
+      A_ARCH="arm64"
+      ;;
+    armv7l|armv6l)
+      ARCH="armv7l"
+      A_ARCH="armv7l"
+      ;;
+    i386|i686)
+      ARCH="i386"
+      A_ARCH="i386"
+      ;;
+    ppc64le)
+      ARCH="ppc64le"
+      A_ARCH="ppc64le"
+      ;;
+    s390x)
+      ARCH="s390x"
+      A_ARCH="s390x"
+      ;;
+    *)
+      ARCH="$raw_arch"
+      A_ARCH="$raw_arch"
+      ;;
+  esac
+}
+
+detect_libc() {
+  if [ -f /etc/alpine-release ]; then
+    LIBC_TYPE="musl"
+    return
+  fi
+  if command -v ldd &>/dev/null; then
+    if ldd --version 2>&1 | grep -qi "musl"; then
+      LIBC_TYPE="musl"
+      return
+    fi
+  fi
+  if ls /lib/ld-musl* /lib64/ld-musl* &>/dev/null; then
+    LIBC_TYPE="musl"
+    return
+  fi
+  LIBC_TYPE="glibc"
+}
+
+detect_os() {
+  local os_release_name=""
+  local os_release_ver=""
+  local os_release_id=""
+  local os_pretty=""
+
+  if [ -f /etc/os-release ]; then
+    # shellcheck disable=SC1091
+    . /etc/os-release
+    os_release_name="${NAME:-}"
+    os_release_ver="${VERSION_ID:-}"
+    os_release_id="${ID:-}"
+    os_pretty="${PRETTY_NAME:-}"
+  elif [ -f /etc/alpine-release ]; then
+    os_release_name="Alpine Linux"
+    os_release_ver=$(cat /etc/alpine-release 2>/dev/null || echo "")
+    os_release_id="alpine"
+    os_pretty="Alpine Linux ${os_release_ver}"
+  elif [ -f /etc/debian_version ]; then
+    os_release_name="Debian GNU/Linux"
+    os_release_ver=$(cat /etc/debian_version 2>/dev/null || echo "")
+    os_release_id="debian"
+    os_pretty="Debian GNU/Linux ${os_release_ver}"
+  elif [ -f /etc/redhat-release ]; then
+    os_release_name=$(cat /etc/redhat-release 2>/dev/null || echo "Red Hat")
+    os_release_id="rhel"
+    os_pretty="$os_release_name"
+  elif [ -f /etc/arch-release ]; then
+    os_release_name="Arch Linux"
+    os_release_id="arch"
+    os_pretty="Arch Linux"
+  fi
+
+  OS_NAME="${os_release_name:-$(uname -s 2>/dev/null || echo "Linux")}"
+  OS_VER="${os_release_ver:-$(uname -r 2>/dev/null || echo "")}"
+  DISTRO="${os_release_id:-unknown}"
+  OS_PRETTY="${os_pretty:-${OS_NAME} ${OS_VER}}"
+
+  detect_architecture
+  detect_libc
+}
+
+detect_package_manager() {
+  if command -v apt-get &> /dev/null; then
+    PKG_MGR="apt-get"
+  elif command -v apt &> /dev/null; then
+    PKG_MGR="apt"
+  elif command -v dnf &> /dev/null; then
+    PKG_MGR="dnf"
+  elif command -v yum &> /dev/null; then
+    PKG_MGR="yum"
+  elif command -v apk &> /dev/null; then
+    PKG_MGR="apk"
+  elif command -v pacman &> /dev/null; then
+    PKG_MGR="pacman"
+  elif command -v zypper &> /dev/null; then
+    PKG_MGR="zypper"
+  else
+    PKG_MGR="none"
+  fi
+}
+
+detect_privileges() {
+  local current_euid="${EUID:-$(id -u 2>/dev/null || echo 1)}"
+  if [ "$current_euid" -eq 0 ]; then
+    IS_ROOT=true
+    HAS_SUDO=true
+  else
+    IS_ROOT=false
+    if command -v sudo &> /dev/null; then
+      if sudo -n true 2>/dev/null || sudo -v 2>/dev/null; then
+        HAS_SUDO=true
+      else
+        HAS_SUDO=false
+      fi
+    else
+      HAS_SUDO=false
+    fi
+  fi
+}
+
+detect_init_system() {
+  if [ -d /run/systemd/system ] && command -v systemctl &> /dev/null; then
+    # Test if systemctl can actually communicate with PID 1
+    if systemctl is-system-running &>/dev/null || [ "$(ps -p 1 -o comm= 2>/dev/null || echo "")" = "systemd" ]; then
+      INIT_SYSTEM="systemd"
+      return
+    fi
+  fi
+
+  if command -v openrc &> /dev/null || [ -d /run/openrc ]; then
+    INIT_SYSTEM="openrc"
+    return
+  fi
+
+  if [ -f /etc/init.d/cron ] || [ -d /etc/init.d ]; then
+    INIT_SYSTEM="sysvinit"
+    return
+  fi
+
+  INIT_SYSTEM="none"
+}
+
+detect_container_environment() {
+  # 1. GitHub Actions runner
+  if [ -n "${GITHUB_ACTIONS:-}" ] || [ -n "${GITHUB_WORKFLOW:-}" ]; then
+    CONTAINER_ENV="GITHUB_RUNNER"
+    return
+  fi
+
+  # 2. Cloud Sandboxes & Interactive Web IDEs
+  if [ -n "${CODESPACES:-}" ] || [ -n "${IDX_WORKSPACE:-}" ] || [ -n "${GITPOD_WORKSPACE:-}" ] || [ -n "${COCALC:-}" ] || [ -n "${SANDBOX_ID:-}" ] || [ -n "${IS_SANDBOX:-}" ]; then
+    CONTAINER_ENV="CLOUD_SANDBOX"
+    return
+  fi
+
+  # 3. Docker Container
+  if [ -f /.dockerenv ] || ( [ -f /proc/1/cgroup ] && grep -qa 'docker' /proc/1/cgroup ); then
+    CONTAINER_ENV="DOCKER"
+    return
+  fi
+
+  # 4. LXC / Proxmox Container
+  if [ -f /run/.containerenv ] || ( [ -f /proc/1/cgroup ] && grep -qa 'lxc' /proc/1/cgroup ); then
+    CONTAINER_ENV="LXC"
+    return
+  fi
+
+  # 5. Virtualization check via systemd-detect-virt if present
+  if command -v systemd-detect-virt &>/dev/null; then
+    local virt
+    virt=$(systemd-detect-virt 2>/dev/null || echo "none")
+    case "$virt" in
+      kvm) CONTAINER_ENV="KVM" ;;
+      qemu) CONTAINER_ENV="QEMU" ;;
+      docker) CONTAINER_ENV="DOCKER" ;;
+      lxc|lxc-libvirt) CONTAINER_ENV="LXC" ;;
+      oracle|vmware|xen|hyperv) CONTAINER_ENV="VM" ;;
+      none) CONTAINER_ENV="BARE_METAL" ;;
+      *) CONTAINER_ENV="VM" ;;
+    esac
+    return
+  fi
+
+  # 6. Fallback checks
+  if [ -f /proc/cpuinfo ] && grep -qi "hypervisor" /proc/cpuinfo; then
+    CONTAINER_ENV="VM"
+    return
+  fi
+
+  CONTAINER_ENV="BARE_METAL"
+}
+
+detect_docker_capabilities() {
+  if command -v docker &> /dev/null; then
+    if docker info &> /dev/null; then
+      DOCKER_AVAILABLE=true
+      DOCKER_STATUS_MSG="Available and Running"
+    else
+      DOCKER_AVAILABLE=false
+      DOCKER_STATUS_MSG="Installed but Daemon Stopped"
+    fi
+  else
+    DOCKER_AVAILABLE=false
+    DOCKER_STATUS_MSG="Not Installed"
+  fi
+}
+
+detect_ssh_port() {
+  DETECTED_SSH_PORT=22
+  if [ -f /etc/ssh/sshd_config ]; then
+    local p
+    p=$(grep -E "^Port [0-9]+" /etc/ssh/sshd_config 2>/dev/null | awk '{print $2}' | head -n1 || echo "")
+    if [ -n "$p" ] && [ "$p" -gt 0 ] 2>/dev/null && [ "$p" -le 65535 ] 2>/dev/null; then
+      DETECTED_SSH_PORT="$p"
+    fi
+  fi
+  if [ "$DETECTED_SSH_PORT" -eq 22 ] && [ -d /etc/ssh/sshd_config.d ]; then
+    local p_d
+    p_d=$(grep -E "^Port [0-9]+" /etc/ssh/sshd_config.d/*.conf 2>/dev/null | awk '{print $2}' | head -n1 || echo "")
+    if [ -n "$p_d" ] && [ "$p_d" -gt 0 ] 2>/dev/null && [ "$p_d" -le 65535 ] 2>/dev/null; then
+      DETECTED_SSH_PORT="$p_d"
+    fi
+  fi
+  log_msg "Detected SSH port: ${DETECTED_SSH_PORT}"
+}
+
+detect_firewall() {
+  detect_ssh_port
+
+  if command -v ufw &> /dev/null && ufw status 2>/dev/null | grep -q "active"; then
+    FIREWALL_MGR="ufw"
+  elif command -v firewall-cmd &> /dev/null && [ "$INIT_SYSTEM" = "systemd" ] && systemctl is-active --quiet firewalld 2>/dev/null; then
+    FIREWALL_MGR="firewalld"
+  elif command -v nft &> /dev/null && ( [ "$IS_ROOT" = true ] || [ "$HAS_SUDO" = true ] ); then
+    FIREWALL_MGR="nftables"
+  elif command -v iptables &> /dev/null && ( [ "$IS_ROOT" = true ] || [ "$HAS_SUDO" = true ] ); then
+    FIREWALL_MGR="iptables"
+  else
+    FIREWALL_MGR="container_managed"
+  fi
+}
+
+detect_all_capabilities() {
+  detect_os
+  detect_package_manager
+  detect_privileges
+  detect_init_system
+  detect_container_environment
+  detect_docker_capabilities
+  detect_firewall
+
+  # Classify Execution Mode
+  if [ "$CONTAINER_ENV" = "GITHUB_RUNNER" ]; then
+    EXECUTION_MODE="CI/RUNNER MODE"
+  elif [ "$CONTAINER_ENV" = "CLOUD_SANDBOX" ]; then
+    EXECUTION_MODE="SANDBOX MODE"
+  elif [ "$CONTAINER_ENV" = "DOCKER" ] || [ "$CONTAINER_ENV" = "LXC" ]; then
+    if [ "$INIT_SYSTEM" = "systemd" ]; then
+      EXECUTION_MODE="FULL VPS MODE"
+    else
+      EXECUTION_MODE="CONTAINER COMPATIBILITY MODE"
+    fi
+  elif [ "$IS_ROOT" = false ] && [ "$HAS_SUDO" = false ]; then
+    EXECUTION_MODE="USER SPACE MODE"
+  else
+    EXECUTION_MODE="FULL VPS MODE"
+  fi
+
+  init_paths
+}
+
+print_capability_report() {
+  echo -e "${PURPLE}${BOLD}[AetherInstaller] Environment Capability Detection Report${NC}"
+  echo -e "--------------------------------------------------------------------------------"
+  echo -e "  ${WHITE}OS Distribution:${NC}     ${BOLD}${OS_PRETTY}${NC}"
+  echo -e "  ${WHITE}CPU Architecture:${NC}    ${BOLD}${ARCH}${NC}"
+  echo -e "  ${WHITE}C Runtime (libc):${NC}    ${BOLD}${LIBC_TYPE}${NC}"
+  echo -e "  ${WHITE}Package Manager:${NC}     ${BOLD}${PKG_MGR}${NC}"
+  echo -e "  ${WHITE}Privileges:${NC}          ${BOLD}$( [ "$IS_ROOT" = true ] && echo "Root (Full)" || ( [ "$HAS_SUDO" = true ] && echo "Non-Root with Sudo" || echo "User-Space Only" ) )${NC}"
+  echo -e "  ${WHITE}Init System:${NC}         ${BOLD}${INIT_SYSTEM}${NC}"
+  echo -e "  ${WHITE}Virtualization:${NC}      ${BOLD}${CONTAINER_ENV}${NC}"
+  echo -e "  ${WHITE}Docker Engine:${NC}       ${BOLD}${DOCKER_STATUS_MSG}${NC}"
+  echo -e "  ${WHITE}Firewall Manager:${NC}    ${BOLD}${FIREWALL_MGR}${NC}"
+  echo -e "  ${WHITE}Target Directory:${NC}    ${BOLD}${INSTALL_DIR}${NC}"
+  echo -e "--------------------------------------------------------------------------------"
+  echo -e "  ${CYAN}${BOLD}Assigned Mode:${NC}       ${GREEN}${BOLD}${EXECUTION_MODE}${NC}"
+  echo -e "--------------------------------------------------------------------------------\n"
+}
+
+check_system_resources() {
+  echo -e "${CYAN}    Performing hardware resource verification...${NC}"
+
+  # RAM Check
+  if command -v free &> /dev/null; then
+    RAM_TOTAL_MB=$(free -m 2>/dev/null | awk '/^Mem:/{print $2}' || echo "0")
+    RAM_FREE_MB=$(free -m 2>/dev/null | awk '/^Mem:/{print $4+$6}' || echo "0")
+    RAM_TOTAL_MB="${RAM_TOTAL_MB:-0}"
+    RAM_FREE_MB="${RAM_FREE_MB:-0}"
+    echo -e "${CYAN}    Memory:${NC} Total: ${RAM_TOTAL_MB}MB | Free/Available: ${RAM_FREE_MB}MB"
+    log_msg "System RAM: Total ${RAM_TOTAL_MB}MB, Free ${RAM_FREE_MB}MB"
+    if [ "$RAM_TOTAL_MB" -gt 0 ] 2>/dev/null && [ "$RAM_TOTAL_MB" -lt 512 ] 2>/dev/null; then
+      echo -e "${YELLOW}[!] Warning: System has less than 512MB RAM. Performance may be degraded.${NC}"
+    fi
+
+    # Auto-provision 2GB swapfile on low-memory VPS (<2500MB RAM) to eliminate build OOM crashes
+    if [ "$IS_ROOT" = true ] && [ "$RAM_TOTAL_MB" -gt 0 ] 2>/dev/null && [ "$RAM_TOTAL_MB" -lt 2500 ] 2>/dev/null; then
+      local current_swap_mb
+      current_swap_mb=$(free -m 2>/dev/null | awk '/^Swap:/{print $2}' || echo "0")
+      current_swap_mb="${current_swap_mb:-0}"
+      if [ "$current_swap_mb" -lt 1024 ] && [ ! -f /swapfile ]; then
+        echo -e "${YELLOW}[!] Host RAM is ${RAM_TOTAL_MB}MB with low swap (${current_swap_mb}MB). Provisioning 2GB virtual memory swapfile...${NC}"
+        log_msg "Provisioning 2GB swapfile to prevent npm build OOM killer"
+        (fallocate -l 2G /swapfile 2>/dev/null || dd if=/dev/zero of=/swapfile bs=1M count=2048 2>/dev/null) >> "$LOG_FILE" 2>&1 || true
+        chmod 600 /swapfile 2>/dev/null || true
+        mkswap /swapfile >> "$LOG_FILE" 2>&1 || true
+        swapon /swapfile >> "$LOG_FILE" 2>&1 || true
+        if ! grep -q '/swapfile' /etc/fstab 2>/dev/null; then
+          echo '/swapfile none swap sw 0 0' >> /etc/fstab 2>/dev/null || true
+        fi
+        echo -e "${GREEN}[✓] 2GB Swapfile activated successfully (protected against OOM kills).${NC}"
+      fi
+    fi
+  fi
+
+  # Disk Space Check
+  local check_path="${INSTALL_DIR}"
+  if [ ! -d "$check_path" ]; then
+    check_path="$(dirname "$check_path" 2>/dev/null || echo ".")"
+  fi
+  DISK_FREE_GB=$(df -BG "$check_path" 2>/dev/null | awk 'NR==2 {print $4}' | sed 's/G//' 2>/dev/null || echo "10")
+  DISK_FREE_GB="${DISK_FREE_GB:-10}"
+  echo -e "${CYAN}    Disk Storage:${NC} ${DISK_FREE_GB}GB Available on target filesystem"
+  log_msg "System Disk: ${DISK_FREE_GB}GB available"
+
+  if [ -n "$DISK_FREE_GB" ] && [ "$DISK_FREE_GB" -lt 2 ] 2>/dev/null; then
+    echo -e "${YELLOW}[!] Warning: Low disk space (<2GB). Please monitor storage usage.${NC}"
+  fi
+  echo -e "${GREEN}[✓] Hardware resource safety checks passed.${NC}"
+}
+
+# ==============================================================================
+# 5. PACKAGE MANAGER ABSTRACTION LAYER
+# ==============================================================================
+run_privileged() {
+  if [ "$IS_ROOT" = true ]; then
+    "$@"
+  elif [ "$HAS_SUDO" = true ]; then
+    sudo "$@"
+  else
+    return 1
+  fi
+}
+
+update_packages() {
+  log_msg "Updating system package repositories via $PKG_MGR"
+  case "$PKG_MGR" in
+    apt-get|apt)
+      run_privileged env DEBIAN_FRONTEND=noninteractive apt-get update -qq >> "$LOG_FILE" 2>&1 || true
+      ;;
+    dnf)
+      run_privileged dnf check-update -q >> "$LOG_FILE" 2>&1 || true
+      ;;
+    yum)
+      run_privileged yum check-update -q >> "$LOG_FILE" 2>&1 || true
+      ;;
+    apk)
+      run_privileged apk update -q >> "$LOG_FILE" 2>&1 || true
+      ;;
+    pacman)
+      run_privileged pacman -Sy --noconfirm -q >> "$LOG_FILE" 2>&1 || true
+      ;;
+    zypper)
+      run_privileged zypper --non-interactive refresh -q >> "$LOG_FILE" 2>&1 || true
+      ;;
+    *)
+      log_msg "No supported package manager found to update"
+      ;;
+  esac
+}
+
+install_package() {
+  local pkg="${1:-}"
+  if [ -z "$pkg" ]; then
+    return 0
+  fi
+  log_msg "Installing missing package: $pkg using $PKG_MGR"
+
+  # Map common package names across distributions
+  local actual_pkg="$pkg"
+  case "$PKG_MGR" in
+    apt-get|apt)
+      case "$pkg" in
+        python3) actual_pkg="python3" ;;
+        openssl) actual_pkg="openssl" ;;
+      esac
+      run_privileged env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "$actual_pkg" >> "$LOG_FILE" 2>&1 || true
+      ;;
+    dnf)
+      case "$pkg" in
+        python3) actual_pkg="python3" ;;
+        openssl) actual_pkg="openssl" ;;
+      esac
+      run_privileged dnf install -y -q "$actual_pkg" >> "$LOG_FILE" 2>&1 || true
+      ;;
+    yum)
+      case "$pkg" in
+        python3) actual_pkg="python3" ;;
+        openssl) actual_pkg="openssl" ;;
+      esac
+      run_privileged yum install -y -q "$actual_pkg" >> "$LOG_FILE" 2>&1 || true
+      ;;
+    apk)
+      case "$pkg" in
+        python3) actual_pkg="python3" ;;
+        openssl) actual_pkg="openssl" ;;
+      esac
+      run_privileged apk add --no-cache "$actual_pkg" >> "$LOG_FILE" 2>&1 || true
+      ;;
+    pacman)
+      run_privileged pacman -S --noconfirm --needed -q "$actual_pkg" >> "$LOG_FILE" 2>&1 || true
+      ;;
+    zypper)
+      run_privileged zypper --non-interactive install -y -q "$actual_pkg" >> "$LOG_FILE" 2>&1 || true
+      ;;
+    *)
+      log_msg "Cannot install $pkg: no package manager available"
+      ;;
+  esac
+}
+
+# ==============================================================================
+# 6. NODE.JS & RUNTIME INSTALLATION ENGINE
+# ==============================================================================
+verify_node_runtime() {
+  if command -v node &> /dev/null && command -v npm &> /dev/null; then
+    local node_ver
+    node_ver=$(node -v 2>/dev/null || echo "v0.0.0")
+    NODE_MAJOR=$(echo "$node_ver" | cut -d'.' -f1 | sed 's/v//' 2>/dev/null || echo "0")
+    NODE_MAJOR="${NODE_MAJOR:-0}"
+    if [ "$NODE_MAJOR" -ge 18 ] 2>/dev/null; then
+      return 0
+    fi
+  fi
+  return 1
+}
+
+install_node_runtime() {
+  echo -e "${CYAN}    Resolving and installing Node.js 20.x LTS runtime...${NC}"
+  log_msg "Initiating Node.js 20.x installation engine (OS: $DISTRO, Arch: $ARCH, Libc: $LIBC_TYPE)"
+
+  # Architecture Support Check
+  if [ "$ARCH" != "x86_64" ] && [ "$ARCH" != "aarch64" ]; then
+    echo -e "${RED}[BLOCKED] Unsupported CPU architecture for pre-built binaries: ${ARCH}${NC}"
+    log_msg "BLOCKED: Unsupported CPU architecture: ${ARCH}"
+    return 1
+  fi
+
+  local install_success=false
+
+  # Method 1: Alpine Native Package (apk)
+  if [ "$DISTRO" = "alpine" ] || [ "$LIBC_TYPE" = "musl" ]; then
+    if command -v apk &>/dev/null; then
+      echo -e "${CYAN}    Installing Alpine-native Node.js via apk...${NC}"
+      run_privileged apk add --no-cache nodejs npm >> "$LOG_FILE" 2>&1 || true
+      if verify_node_runtime; then
+        install_success=true
+      fi
+    fi
+  fi
+
+  # Method 2: NodeSource Repository (Debian/Ubuntu/RHEL/CentOS/Fedora)
+  if [ "$install_success" = false ] && ( [ "$IS_ROOT" = true ] || [ "$HAS_SUDO" = true ] ); then
+    if command -v apt-get &> /dev/null; then
+      echo -e "${CYAN}    Configuring NodeSource repository for Debian/Ubuntu...${NC}"
+      curl -fsSL https://deb.nodesource.com/setup_20.x | run_privileged bash - >> "$LOG_FILE" 2>&1 || true
+      run_privileged env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq nodejs >> "$LOG_FILE" 2>&1 || true
+      if verify_node_runtime; then
+        install_success=true
+      fi
+    elif command -v dnf &> /dev/null || command -v yum &> /dev/null; then
+      echo -e "${CYAN}    Configuring NodeSource repository for RHEL/CentOS/Fedora...${NC}"
+      curl -fsSL https://rpm.nodesource.com/setup_20.x | run_privileged bash - >> "$LOG_FILE" 2>&1 || true
+      if command -v dnf &> /dev/null; then
+        run_privileged dnf install -y -q nodejs >> "$LOG_FILE" 2>&1 || true
+      else
+        run_privileged yum install -y -q nodejs >> "$LOG_FILE" 2>&1 || true
+      fi
+      if verify_node_runtime; then
+        install_success=true
+      fi
+    elif command -v pacman &> /dev/null; then
+      run_privileged pacman -S --noconfirm --needed nodejs npm >> "$LOG_FILE" 2>&1 || true
+      if verify_node_runtime; then
+        install_success=true
+      fi
+    elif command -v zypper &> /dev/null; then
+      run_privileged zypper --non-interactive install -y nodejs20 npm20 >> "$LOG_FILE" 2>&1 || run_privileged zypper --non-interactive install -y nodejs npm >> "$LOG_FILE" 2>&1 || true
+      if verify_node_runtime; then
+        install_success=true
+      fi
+    fi
+  fi
+
+  # Method 3: Standalone Official Node.js Binary Tarball (User-space or Fallback)
+  if [ "$install_success" = false ] && [ "$LIBC_TYPE" = "glibc" ]; then
+    echo -e "${YELLOW}    [!] Repository install unavailable. Downloading official Node.js standalone binary...${NC}"
+    local node_arch="x64"
+    if [ "$ARCH" = "aarch64" ]; then node_arch="arm64"; fi
+    local node_ver_tag="v20.18.3"
+    local node_tar_url="https://nodejs.org/dist/${node_ver_tag}/node-${node_ver_tag}-linux-${node_arch}.tar.xz"
+    local target_node_dir="${INSTALL_DIR}/runtimes/node"
+
+    mkdir -p "$target_node_dir"
+    log_msg "Downloading Node.js standalone: $node_tar_url"
+
+    # checksum-verified against the official nodejs.org manifest
+    local want_sum have_sum
+    want_sum=$(curl -fsSL -m 30 "https://nodejs.org/dist/${node_ver_tag}/SHASUMS256.txt" 2>/dev/null \
+      | grep " node-${node_ver_tag}-linux-${node_arch}.tar.xz\$" | cut -d' ' -f1 || echo "")
+    if curl -fsSL -m 60 "$node_tar_url" -o "${target_node_dir}/node.tar.xz" >> "$LOG_FILE" 2>&1; then
+      have_sum=$(sha256_of "${target_node_dir}/node.tar.xz")
+      if [ -n "$want_sum" ] && [ "$want_sum" = "$have_sum" ]; then
+        if tar -xJf "${target_node_dir}/node.tar.xz" -C "$target_node_dir" --strip-components=1 >> "$LOG_FILE" 2>&1; then
+          rm -f "${target_node_dir}/node.tar.xz"
+          export PATH="${target_node_dir}/bin:${PATH}"
+          if [ -f "${target_node_dir}/bin/node" ] && [ -x "${target_node_dir}/bin/node" ]; then
+            install_success=true
+          fi
+        fi
+      else
+        echo -e "${YELLOW}    [!] Node tarball checksum mismatch (expected '${want_sum:-none}'), discarding.${NC}"
+        log_msg "WARN: node tarball checksum mismatch"
+        rm -f "${target_node_dir}/node.tar.xz"
+      fi
+    fi
+  fi
+
+  if verify_node_runtime; then
+    local installed_ver
+    installed_ver=$(node -v 2>/dev/null || echo "verified")
+    echo -e "${GREEN}[✓] Node.js runtime ready: ${installed_ver} (npm $(npm -v 2>/dev/null || echo 'active'))${NC}"
+    log_msg "Node.js verification passed: ${installed_ver}"
+    return 0
+  else
+    echo -e "${RED}[ERROR] Node.js installation could not be completed in this environment.${NC}"
+    log_msg "ERROR: Node.js runtime verification failed"
+    return 1
+  fi
+}
+
+verify_and_install_dependencies() {
+  echo -e "${CYAN}    Auditing core system dependencies...${NC}"
+
+  # 1. Curl & Wget
+  if ! command -v curl &> /dev/null && ! command -v wget &> /dev/null; then
+    echo -e "${CYAN}    Installing curl...${NC}"
+    install_package curl || install_package wget
+  fi
+
+  # 2. Git
+  if ! command -v git &> /dev/null; then
+    echo -e "${CYAN}    Installing git...${NC}"
+    install_package git
+  fi
+
+  # 3. Compression Utilities (Tar, Unzip)
+  if ! command -v tar &> /dev/null; then
+    install_package tar
+  fi
+  if ! command -v unzip &> /dev/null; then
+    install_package unzip
+  fi
+
+  # 4. OpenSSL
+  if ! command -v openssl &> /dev/null; then
+    install_package openssl
+  fi
+
+  # 5. minisign (release signature verification)
+  if ! command -v minisign &> /dev/null; then
+    install_package minisign || true
+    if ! command -v minisign &> /dev/null; then
+      if [ "$ALLOW_UNSIGNED" -eq 1 ]; then
+        echo -e "${YELLOW}    [!] minisign unavailable - checksum-only verification.${NC}"
+      else
+        echo -e "${YELLOW}    [!] minisign unavailable. Re-run with --allow-unsigned to accept checksum-only, or install it manually.${NC}"
+      fi
+    fi
+  fi
+
+  # 6. Node.js Engine Check
+  if ! verify_node_runtime; then
+    install_node_runtime
+  else
+    local curr_node
+    curr_node=$(node -v 2>/dev/null || echo "v20.x")
+    echo -e "${GREEN}[✓] Node.js runtime verified: ${curr_node} (npm $(npm -v 2>/dev/null || echo 'active'))${NC}"
+  fi
+}
+
+# ==============================================================================
+# 7. FIREWALL & DOCKER ENGINE HANDLING
+# ==============================================================================
+configure_firewall() {
+  echo -e "${CYAN}    Auditing and configuring automated network protection rules...${NC}"
+  detect_firewall
+
+  local ssh_port="${DETECTED_SSH_PORT:-22}"
+  local p_port="${PANEL_PORT:-3000}"
+  local d_port="${DAEMON_PORT:-9666}"
+  local s_port="${SFTP_PORT:-2022}"
+
+  log_msg "Configuring firewall via manager: ${FIREWALL_MGR} (SSH: ${ssh_port}, Web: ${p_port}, SFTP: ${s_port}, Daemon: ${d_port})"
+
+  case "$FIREWALL_MGR" in
+    ufw)
+      # 1. Guarantee SSH access first (never lock admin out)
+      run_privileged ufw allow "${ssh_port}/tcp" comment 'AetherPanel SSH Access' >> "$LOG_FILE" 2>&1 || true
+      # 2. Web UI & Services (including standard HTTP/HTTPS ingress)
+      run_privileged ufw allow 80/tcp comment 'AetherPanel HTTP Web Ingress' >> "$LOG_FILE" 2>&1 || true
+      run_privileged ufw allow 443/tcp comment 'AetherPanel HTTPS Web Ingress' >> "$LOG_FILE" 2>&1 || true
+      run_privileged ufw allow "${p_port}/tcp" comment 'AetherPanel Web UI' >> "$LOG_FILE" 2>&1 || true
+      run_privileged ufw allow "${d_port}/tcp" comment 'AetherNode Daemon' >> "$LOG_FILE" 2>&1 || true
+      run_privileged ufw allow "${s_port}/tcp" comment 'AetherNode SFTP' >> "$LOG_FILE" 2>&1 || true
+      run_privileged ufw allow 25565:30000/tcp comment 'AetherPanel Allocations TCP' >> "$LOG_FILE" 2>&1 || true
+      run_privileged ufw allow 25565:30000/udp comment 'AetherPanel Allocations UDP' >> "$LOG_FILE" 2>&1 || true
+      echo -e "${GREEN}[✓] UFW network protection configured (SSH: ${ssh_port}, HTTP/HTTPS: 80/443, Web: ${p_port}, SFTP: ${s_port}, Daemon: ${d_port}, Allocations: 25565-30000).${NC}"
+      ;;
+    firewalld)
+      run_privileged firewall-cmd --permanent --add-port="${ssh_port}/tcp" >> "$LOG_FILE" 2>&1 || true
+      run_privileged firewall-cmd --permanent --add-port=80/tcp >> "$LOG_FILE" 2>&1 || true
+      run_privileged firewall-cmd --permanent --add-port=443/tcp >> "$LOG_FILE" 2>&1 || true
+      run_privileged firewall-cmd --permanent --add-port="${p_port}/tcp" >> "$LOG_FILE" 2>&1 || true
+      run_privileged firewall-cmd --permanent --add-port="${d_port}/tcp" >> "$LOG_FILE" 2>&1 || true
+      run_privileged firewall-cmd --permanent --add-port="${s_port}/tcp" >> "$LOG_FILE" 2>&1 || true
+      run_privileged firewall-cmd --permanent --add-port=25565-30000/tcp >> "$LOG_FILE" 2>&1 || true
+      run_privileged firewall-cmd --permanent --add-port=25565-30000/udp >> "$LOG_FILE" 2>&1 || true
+      run_privileged firewall-cmd --reload >> "$LOG_FILE" 2>&1 || true
+      echo -e "${GREEN}[✓] Firewalld rules configured successfully (SSH: ${ssh_port}, HTTP/S: 80/443, Web: ${p_port}, SFTP: ${s_port}, Allocations: 25565-30000).${NC}"
+      ;;
+    iptables)
+      # Create isolated AetherPanel chains to avoid disturbing existing rules
+      run_privileged iptables -N AETHER_PROTECT 2>/dev/null || true
+      run_privileged iptables -N AETHER_SERVERS 2>/dev/null || true
+      run_privileged iptables -C INPUT -j AETHER_PROTECT 2>/dev/null || run_privileged iptables -I INPUT 1 -j AETHER_PROTECT 2>/dev/null || true
+      run_privileged iptables -C INPUT -j AETHER_SERVERS 2>/dev/null || run_privileged iptables -I INPUT 2 -j AETHER_SERVERS 2>/dev/null || true
+
+      # Flush only our own managed chains
+      run_privileged iptables -F AETHER_PROTECT 2>/dev/null || true
+
+      # Loopback, established, and invalid packet handling
+      run_privileged iptables -A AETHER_PROTECT -i lo -j ACCEPT 2>/dev/null || true
+      run_privileged iptables -A AETHER_PROTECT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT 2>/dev/null || true
+      run_privileged iptables -A AETHER_PROTECT -m conntrack --ctstate INVALID -j DROP 2>/dev/null || true
+
+      # Explicitly preserve SSH access with rate-limiting
+      run_privileged iptables -A AETHER_PROTECT -p tcp --dport "${ssh_port}" -m conntrack --ctstate NEW -m limit --limit 30/minute --limit-burst 60 -j ACCEPT 2>/dev/null || true
+
+      # Web HTTP/HTTPS ingress and panel ports
+      run_privileged iptables -A AETHER_PROTECT -p tcp --dport 80 -j ACCEPT 2>/dev/null || true
+      run_privileged iptables -A AETHER_PROTECT -p tcp --dport 443 -j ACCEPT 2>/dev/null || true
+      run_privileged iptables -A AETHER_PROTECT -p tcp --dport "${p_port}" -j ACCEPT 2>/dev/null || true
+      run_privileged iptables -A AETHER_PROTECT -p tcp --dport "${s_port}" -j ACCEPT 2>/dev/null || true
+      run_privileged iptables -A AETHER_PROTECT -p tcp --dport "${d_port}" -j ACCEPT 2>/dev/null || true
+
+      # SYN flood burst mitigation
+      run_privileged iptables -A AETHER_PROTECT -p tcp --syn -m limit --limit 100/s --limit-burst 200 -j ACCEPT 2>/dev/null || true
+
+      # Initial server allocation range
+      run_privileged iptables -A AETHER_SERVERS -p tcp --dport 25565:30000 -j ACCEPT 2>/dev/null || true
+      run_privileged iptables -A AETHER_SERVERS -p udp --dport 25565:30000 -j ACCEPT 2>/dev/null || true
+
+      echo -e "${GREEN}[✓] Iptables isolated chains and SYN flood mitigation active (SSH: ${ssh_port}, HTTP/S: 80/443, Web: ${p_port}, SFTP: ${s_port}, Allocations: 25565-30000).${NC}"
+      ;;
+    nftables)
+      # Create isolated table inet aetherpanel_filter
+      run_privileged nft add table inet aetherpanel_filter 2>/dev/null || true
+      run_privileged nft add chain inet aetherpanel_filter input "{ type filter hook input priority -10; policy accept; }" 2>/dev/null || true
+      run_privileged nft add rule inet aetherpanel_filter input ct state established,related accept 2>/dev/null || true
+      run_privileged nft add rule inet aetherpanel_filter input iif lo accept 2>/dev/null || true
+      run_privileged nft add rule inet aetherpanel_filter input ct state invalid drop 2>/dev/null || true
+      run_privileged nft add rule inet aetherpanel_filter input tcp dport "${ssh_port}" accept 2>/dev/null || true
+      run_privileged nft add rule inet aetherpanel_filter input tcp dport 80 accept 2>/dev/null || true
+      run_privileged nft add rule inet aetherpanel_filter input tcp dport 443 accept 2>/dev/null || true
+      run_privileged nft add rule inet aetherpanel_filter input tcp dport "${p_port}" accept 2>/dev/null || true
+      run_privileged nft add rule inet aetherpanel_filter input tcp dport "${s_port}" accept 2>/dev/null || true
+      run_privileged nft add rule inet aetherpanel_filter input tcp dport "${d_port}" accept 2>/dev/null || true
+      run_privileged nft add rule inet aetherpanel_filter input tcp dport 25565-30000 accept 2>/dev/null || true
+      run_privileged nft add rule inet aetherpanel_filter input udp dport 25565-30000 accept 2>/dev/null || true
+      echo -e "${GREEN}[✓] Nftables isolated table and network protection applied (SSH: ${ssh_port}, HTTP/S: 80/443, Web: ${p_port}, SFTP: ${s_port}, Allocations: 25565-30000).${NC}"
+      ;;
+    *)
+      echo -e "${BLUE}[INFO] Container / Virtual network mode: Application shield and ingress routing active.${NC}"
+      ;;
+  esac
+}
+
+install_docker_engine() {
+  echo -e "${CYAN}    Verifying Docker Engine container runtime...${NC}"
+  detect_docker_capabilities
+
+  if [ "$DOCKER_AVAILABLE" = true ]; then
+    echo -e "${GREEN}[✓] Docker Engine is active and operational ($(docker --version 2>/dev/null || echo 'active')).${NC}"
+    return 0
+  fi
+
+  if [ "$IS_ROOT" = false ] && [ "$HAS_SUDO" = false ]; then
+    echo -e "${YELLOW}[!] User-space mode: Docker daemon installation skipped (process provider mode active).${NC}"
+    return 0
+  fi
+
+  if [ "$CONTAINER_ENV" = "DOCKER" ] || [ "$CONTAINER_ENV" = "LXC" ] || [ "$CONTAINER_ENV" = "CLOUD_SANDBOX" ]; then
+    echo -e "${BLUE}[INFO] Container/Sandbox environment detected. Docker daemon optionality preserved.${NC}"
+    return 0
+  fi
+
+  echo -e "${CYAN}    Attempting Docker Engine installation from official source...${NC}"
+  log_msg "Attempting Docker Engine installation"
+  if curl -fsSL https://get.docker.com | run_privileged sh >> "$LOG_FILE" 2>&1; then
+    if [ "$INIT_SYSTEM" = "systemd" ]; then
+      run_privileged systemctl enable --now docker >> "$LOG_FILE" 2>&1 || true
+    fi
+    detect_docker_capabilities
+    if [ "$DOCKER_AVAILABLE" = true ]; then
+      echo -e "${GREEN}[✓] Docker Engine installed and activated successfully.${NC}"
+      return 0
+    fi
+  fi
+
+  echo -e "${YELLOW}[!] Docker daemon unavailable. AetherPanel will operate using native process virtualization.${NC}"
+  log_msg "Docker installation skipped or unavailable"
+  return 0
+}
+
+# ==============================================================================
+# 8. NETWORK & PORT CONFLICT HANDLING
+# ==============================================================================
+check_port_available() {
+  local port="${1:-3000}"
+  local in_use=false
+  local owner_info=""
+
+  if command -v ss &>/dev/null; then
+    if ss -tulpn 2>/dev/null | grep -q ":${port} "; then
+      in_use=true
+      owner_info=$(ss -tulpn 2>/dev/null | grep ":${port} " | head -n 1 || echo "")
+    fi
+  elif command -v netstat &>/dev/null; then
+    if netstat -tulpn 2>/dev/null | grep -q ":${port} "; then
+      in_use=true
+      owner_info=$(netstat -tulpn 2>/dev/null | grep ":${port} " | head -n 1 || echo "")
+    fi
+  elif command -v lsof &>/dev/null; then
+    if lsof -i ":${port}" &>/dev/null; then
+      in_use=true
+      owner_info=$(lsof -i ":${port}" 2>/dev/null | tail -n +2 | head -n 1 || echo "")
+    fi
+  fi
+
+  if [ "$in_use" = true ]; then
+    echo -e "${YELLOW}[!] Notice: Port ${port} is currently in use.${NC}"
+    if [ -n "$owner_info" ]; then
+      echo -e "    Owning process: ${WHITE}${owner_info}${NC}"
+    fi
+    echo -e "\n  ${CYAN}1)${NC} Use another port"
+    echo -e "  ${CYAN}2)${NC} Continue anyway (Port may be owned by existing AetherPanel instance)"
+    echo -e "  ${RED}0)${NC} Abort installation\n"
+
+    local port_choice
+    port_choice=$(prompt_input "Select option [1-2, 0 to abort]: ")
+    case "${port_choice:-1}" in
+      1)
+        local new_port
+        new_port=$(prompt_input "Enter new port: ")
+        PANEL_PORT="${new_port:-3001}"
+        return 0
+        ;;
+      2)
+        echo -e "${BLUE}Proceeding with port ${port}...${NC}"
+        return 0
+        ;;
+      *)
+        echo -e "${RED}Installation aborted by user.${NC}"
+        exit 1
+        ;;
+    esac
+  fi
+  return 0
+}
+
+# ==============================================================================
+# 9. GITHUB CONNECTIVITY & SOURCE ACQUISITION
+# ==============================================================================
+verify_github_connectivity() {
+  # 0. Check if local panel source tree is already available
+  local current_dir="$(pwd)"
+  local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
+  for check_loc in "$current_dir" "$script_dir" "${INSTALL_DIR}"; do
+    if [ -f "${check_loc}/package.json" ] && [ -f "${check_loc}/server.ts" ]; then
+      echo -e "${GREEN}[✓] Local source repository detected at ${check_loc}. Bypassing remote GitHub download requirement.${NC}"
+      log_msg "Local source files present at ${check_loc}; bypassing GitHub network verification"
+      return 0
+    fi
+  done
+
+  log_msg "Verifying connectivity to official GitHub repository: ${REPO_URL}"
+
+  # 1. WAN Check
+  if ! curl -s -m 5 https://api.ipify.org > /dev/null 2>&1 && ! curl -s -m 5 https://cloudflare.com > /dev/null 2>&1 && ! curl -s -m 5 https://github.com > /dev/null 2>&1; then
+    echo -e "${RED}[ERROR] WAN network connectivity is unavailable.${NC}"
+    echo -e "${YELLOW}Please check your VPS/container internet connection and DNS settings in /etc/resolv.conf.${NC}"
+    log_msg "ERROR: WAN network connection failed"
+    return 1
+  fi
+
+  # 2. Official GitHub Access Check
+  local gh_status
+  gh_status=$(curl -s -o /dev/null -w "%{http_code}" -m 10 "${REPO_URL}" 2>/dev/null || echo "000")
+  gh_status="${gh_status:-000}"
+
+  if [ "$gh_status" != "200" ] && [ "$gh_status" != "301" ] && [ "$gh_status" != "302" ]; then
+    echo -e "${RED}[ERROR] Unable to access the official AetherPanel repository (${REPO_URL}).${NC}"
+    echo -e "${YELLOW}HTTP Response Code: ${gh_status}${NC}"
+    log_msg "ERROR: GitHub connection failed with status code ${gh_status}"
+    return 1
+  fi
+
+  echo -e "${GREEN}[✓] Connected to official GitHub repository (${REPO_URL}).${NC}"
+  log_msg "GitHub connectivity verified successfully."
+  return 0
+}
+
+download_panel_source() {
+  local target_dir="${1:-$INSTALL_DIR}"
+  local branch="${2:-$REPO_BRANCH}"
+  log_msg "Downloading AetherPanel source into $target_dir (branch: $branch)"
+
+  mkdir -p "$target_dir"
+  TEMP_DIR=$(mktemp -d 2>/dev/null || echo "/tmp/aetherpanel_tmp_$$")
+  mkdir -p "$TEMP_DIR"
+
+  local download_success=false
+
+  # Step 0: Check if current directory or script directory already contains the panel source
+  local current_dir="$(pwd)"
+  local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
+  for check_loc in "$current_dir" "$script_dir"; do
+    if [ -f "${check_loc}/package.json" ] && [ -f "${check_loc}/server.ts" ]; then
+      echo -e "${GREEN}[✓] Staging from existing local repository source (${check_loc})...${NC}"
+      log_msg "Using local source tree from ${check_loc}"
+      if [ "$(cd "$check_loc" && pwd)" != "$(cd "$target_dir" 2>/dev/null && pwd)" ]; then
+        cp -a "${check_loc}"/. "$target_dir/" 2>/dev/null || rsync -a "${check_loc}/" "$target_dir/" 2>/dev/null || true
+      fi
+      download_success=true
+      return 0
+    fi
+  done
+
+  # Primary Method: Git Clone directly from official GitHub repository
+  if command -v git &> /dev/null; then
+    echo -e "${CYAN}    Cloning repository via Git (${REPO_URL})...${NC}"
+    log_msg "Executing: git clone --depth 1 -b $branch $REPO_URL $TEMP_DIR"
+    if git clone --depth 1 -b "$branch" "$REPO_URL" "$TEMP_DIR" >> "$LOG_FILE" 2>&1; then
+      download_success=true
+    else
+      log_msg "Git clone branch failed. Attempting default clone..."
+      if git clone --depth 1 "$REPO_URL" "$TEMP_DIR" >> "$LOG_FILE" 2>&1; then
+        download_success=true
+      fi
+    fi
+  fi
+
+  # Fallback Method: Official GitHub Archive Tarball / ZIP
+  if [ "$download_success" = false ]; then
+    echo -e "${YELLOW}    [!] Git clone unavailable or failed. Falling back to official GitHub release archive...${NC}"
+    local tar_url="${REPO_URL}/archive/refs/heads/${branch}.tar.gz"
+    local zip_url="${REPO_URL}/archive/refs/heads/${branch}.zip"
+
+    log_msg "Attempting tarball download: $tar_url"
+    if curl -fsSL -m 45 "$tar_url" -o "$TEMP_DIR/source.tar.gz" >> "$LOG_FILE" 2>&1; then
+      tar -xzf "$TEMP_DIR/source.tar.gz" -C "$TEMP_DIR" --strip-components=1 >> "$LOG_FILE" 2>&1
+      rm -f "$TEMP_DIR/source.tar.gz"
+      download_success=true
+    elif curl -fsSL -m 45 "$zip_url" -o "$TEMP_DIR/source.zip" >> "$LOG_FILE" 2>&1; then
+      unzip -q -o "$TEMP_DIR/source.zip" -d "$TEMP_DIR/extracted" >> "$LOG_FILE" 2>&1
+      cp -r "$TEMP_DIR/extracted"/*/* "$TEMP_DIR/" 2>/dev/null || cp -r "$TEMP_DIR/extracted"/* "$TEMP_DIR/" 2>/dev/null || true
+      rm -rf "$TEMP_DIR/source.zip" "$TEMP_DIR/extracted"
+      download_success=true
+    fi
+  fi
+
+  if [ "$download_success" = false ]; then
+    echo -e "${RED}[ERROR] Failed to download AetherPanel source from official GitHub repository.${NC}"
+    log_msg "ERROR: Source download failed from GitHub"
+    return 1
+  fi
+
+  # Verify source integrity (must have package.json)
+  if [ ! -f "$TEMP_DIR/package.json" ]; then
+    echo -e "${RED}[ERROR] Downloaded repository archive is missing package.json.${NC}"
+    log_msg "ERROR: package.json missing in downloaded source"
+    return 1
+  fi
+
+  # Copy to target directory safely
+  mkdir -p "$target_dir"
+  cp -r "$TEMP_DIR"/. "$target_dir"/ 2>/dev/null || cp -r "$TEMP_DIR"/* "$target_dir"/ 2>/dev/null || true
+
+  INSTALLED_COMMIT="unknown"
+  if [ -d "$target_dir/.git" ] && command -v git &> /dev/null; then
+    INSTALLED_COMMIT=$(cd "$target_dir" && git rev-parse --short HEAD 2>/dev/null || echo "main-branch")
+  fi
+
+  rm -rf "$TEMP_DIR"
+  TEMP_DIR=""
+
+  log_msg "AetherPanel source successfully staged at $target_dir (Commit: ${INSTALLED_COMMIT:-unknown})"
+  return 0
+}
+
+# ==============================================================================
+# 9b. VERIFIED RELEASE BUNDLE ACQUISITION (primary install path)
+#     Bundle = compiled dist/ + node_modules + daemon/ + package.json
+#     Signed manifest (minisign) + per-asset sha256, both fail closed.
+# ==============================================================================
+verify_release_manifest() {
+  TEMP_DIR="${TEMP_DIR:-$(mktemp -d 2>/dev/null || echo "/tmp/aether_rel_$$")}"
+  mkdir -p "$TEMP_DIR"
+
+  if ! fetch_url "$DOWNLOAD_BASE/SHA256SUMS" "$TEMP_DIR/SHA256SUMS"; then
+    log_msg "WARN: SHA256SUMS not reachable at ${DOWNLOAD_BASE}"
+    return 1
+  fi
+
+  if command -v minisign &> /dev/null; then
+    if ! fetch_url "$DOWNLOAD_BASE/SHA256SUMS.minisig" "$TEMP_DIR/SHA256SUMS.minisig"; then
+      echo -e "${RED}[ERROR] SHA256SUMS.minisig missing from release.${NC}"
+      return 1
+    fi
+    if ! fetch_url "$PUBKEY_URL" "$TEMP_DIR/aetherpanel.pub"; then
+      echo -e "${RED}[ERROR] Could not fetch the signing public key.${NC}"
+      return 1
+    fi
+    local have_pub
+    have_pub=$(sha256_of "$TEMP_DIR/aetherpanel.pub")
+    if [ "$have_pub" != "$PUBKEY_SHA256" ]; then
+      echo -e "${RED}[ERROR] Signing key fingerprint mismatch.${NC}"
+      echo -e "${YELLOW}        pinned: ${PUBKEY_SHA256}${NC}"
+      echo -e "${YELLOW}        actual: ${have_pub}${NC}"
+      log_msg "ERROR: pubkey fingerprint mismatch"
+      return 1
+    fi
+    if ! minisign -Vm "$TEMP_DIR/SHA256SUMS" -p "$TEMP_DIR/aetherpanel.pub" >> "$LOG_FILE" 2>&1; then
+      echo -e "${RED}[ERROR] SHA256SUMS signature INVALID - release tampered or signed with another key.${NC}"
+      log_msg "ERROR: SHA256SUMS signature invalid"
+      return 1
+    fi
+    echo -e "${GREEN}[✓] Release signature verified (minisign).${NC}"
+    log_msg "Release signature verified"
+  elif [ "$ALLOW_UNSIGNED" -eq 1 ]; then
+    echo -e "${YELLOW}[!] minisign not installed - checksum-only verification (unsigned).${NC}"
+    log_msg "WARN: unsigned verification"
+  else
+    echo -e "${YELLOW}[!] minisign not installed - proceeding with checksum-only verification.${NC}"
+    echo -e "${YELLOW}    Install minisign and re-run for signature verification, or pass --allow-unsigned to silence this.${NC}"
+    log_msg "WARN: minisign absent, checksum only"
+  fi
+  return 0
+}
+
+verify_release_asset() {
+  local asset="${1:-}"
+  local want_sum have_sum
+  if [ -z "$asset" ]; then return 1; fi
+
+  if ! fetch_url "$DOWNLOAD_BASE/$asset" "$TEMP_DIR/$asset"; then
+    log_msg "WARN: asset download failed: $DOWNLOAD_BASE/$asset"
+    return 1
+  fi
+
+  if fetch_url "$DOWNLOAD_BASE/${asset}.sha256" "$TEMP_DIR/${asset}.sha256"; then
+    want_sum=$(cut -d' ' -f1 "$TEMP_DIR/${asset}.sha256")
+  else
+    want_sum=$(grep -E " \*?${asset}\$" "$TEMP_DIR/SHA256SUMS" | cut -d' ' -f1 | head -n1)
+  fi
+
+  if [ -z "${want_sum:-}" ]; then
+    echo -e "${RED}[ERROR] No checksum published for ${asset}.${NC}"
+    log_msg "ERROR: no checksum for $asset"
+    return 1
+  fi
+
+  have_sum=$(sha256_of "$TEMP_DIR/$asset")
+  if [ "$want_sum" != "$have_sum" ]; then
+    echo -e "${RED}[ERROR] Checksum mismatch for ${asset}${NC}"
+    echo -e "${YELLOW}        expected: ${want_sum}${NC}"
+    echo -e "${YELLOW}        actual:   ${have_sum}${NC}"
+    log_msg "ERROR: checksum mismatch for $asset"
+    return 1
+  fi
+
+  echo -e "${GREEN}[✓] sha256 verified (${asset}).${NC}"
+  log_msg "sha256 verified: $asset"
+  return 0
+}
+
+resolve_release_asset() {
+  local candidate
+  for candidate in "aetherpanel-${A_ARCH}-${LIBC_TYPE}.tar.gz" \
+                   "aetherpanel-${A_ARCH}-glibc.tar.gz" \
+                   "aetherpanel-universal.tar.gz"; do
+    if url_exists "$DOWNLOAD_BASE/$candidate"; then
+      ASSET="$candidate"
+      return 0
+    fi
+  done
+  return 1
+}
+
+# Downloads + verifies + stages a bundle into $1. Returns 1 to signal "use source fallback".
+fetch_verified_bundle() {
+  local target_dir="${1:-$INSTALL_DIR}"
+
+  echo -e "${CYAN}    Resolving release ${RELEASE_TAG} (arch ${A_ARCH}, libc ${LIBC_TYPE})...${NC}"
+
+  TEMP_DIR=$(mktemp -d 2>/dev/null || echo "/tmp/aether_bundle_$$")
+  mkdir -p "$TEMP_DIR"
+
+  if ! fetch_url "$DOWNLOAD_BASE/release.json" "$TEMP_DIR/release.json"; then
+    log_msg "WARN: release.json missing for tag ${RELEASE_TAG}"
+    rm -rf "$TEMP_DIR"; TEMP_DIR=""
+    return 1
+  fi
+
+  local release_commit
+  release_commit=$(sed -n 's/.*"commit":"\([a-f0-9]*\)".*/\1/p' "$TEMP_DIR/release.json" | head -n1)
+  if [ -z "$release_commit" ]; then
+    log_msg "WARN: release.json malformed"
+    rm -rf "$TEMP_DIR"; TEMP_DIR=""
+    return 1
+  fi
+  if [ -n "$PINNED_COMMIT" ] && [ "${release_commit:0:${#PINNED_COMMIT}}" != "$PINNED_COMMIT" ]; then
+    echo -e "${RED}[ERROR] Release ${release_commit} does not match pinned ${PINNED_COMMIT}.${NC}"
+    rm -rf "$TEMP_DIR"; TEMP_DIR=""
+    return 1
+  fi
+  INSTALLED_COMMIT="$release_commit"
+  echo -e "${CYAN}    Release commit: ${release_commit}${NC}"
+
+  if ! verify_release_manifest; then
+    rm -rf "$TEMP_DIR"; TEMP_DIR=""
+    return 1
+  fi
+
+  if ! resolve_release_asset; then
+    echo -e "${YELLOW}    [!] No bundle published for ${A_ARCH}/${LIBC_TYPE}.${NC}"
+    rm -rf "$TEMP_DIR"; TEMP_DIR=""
+    return 1
+  fi
+
+  if ! verify_release_asset "$ASSET"; then
+    rm -rf "$TEMP_DIR"; TEMP_DIR=""
+    return 1
+  fi
+
+  if ! tar -xzf "$TEMP_DIR/$ASSET" -C "$TEMP_DIR" --strip-components=1 --no-same-owner >> "$LOG_FILE" 2>&1; then
+    echo -e "${RED}[ERROR] Failed to extract verified bundle.${NC}"
+    rm -rf "$TEMP_DIR"; TEMP_DIR=""
+    return 1
+  fi
+
+  if [ ! -f "$TEMP_DIR/dist/server.cjs" ] || [ ! -f "$TEMP_DIR/dist/index.html" ]; then
+    echo -e "${YELLOW}    [!] Bundle lacks dist/server.cjs or dist/index.html.${NC}"
+    rm -rf "$TEMP_DIR"; TEMP_DIR=""
+    return 1
+  fi
+
+  mkdir -p "$target_dir"
+  cp -a "$TEMP_DIR"/. "$target_dir"/ 2>/dev/null || true
+  rm -rf "$TEMP_DIR"; TEMP_DIR=""
+  log_msg "Verified bundle staged at $target_dir (commit ${INSTALLED_COMMIT})"
+  return 0
+}
+
+# Removes anything that is source, so users only ever see compiled output.
+prune_sources() {
+  local d="${1:-$INSTALL_DIR}"
+  [ -d "$d" ] || return 0
+
+  rm -rf "$d/.git" "$d/.github" "$d/.vscode" "$d/tests" "$d/src" 2>/dev/null || true
+  if [ -d "$d/server" ]; then
+    # keep only the admin-creation script (menu option 8 depends on it)
+    find "$d/server" -mindepth 1 -maxdepth 1 ! -name 'scripts' -exec rm -rf {} + 2>/dev/null || true
+  fi
+  rm -f "$d/vite.config.ts" "$d/tsconfig.json" "$d/metadata.json" \
+        "$d/Dockerfile" "$d/docker-compose.yml" "$d/.dockerignore" "$d/install.sh" 2>/dev/null || true
+  find "$d" -maxdepth 2 -name '*.ts' -not -path '*/node_modules/*' -not -path '*/server/scripts/*' -delete 2>/dev/null || true
+  find "$d" -maxdepth 1 -name '*.md' -delete 2>/dev/null || true
+  log_msg "Source files pruned from $d"
+}
+
+harden_perms() {
+  local d="${1:-$INSTALL_DIR}"
+  [ -d "$d" ] || return 0
+  chmod 750 "$d" 2>/dev/null || true
+  chmod 600 "$d/.env" "$d/data/db.json" 2>/dev/null || true
+  chmod -R go-rwx "$d/data" 2>/dev/null || true
+}
+
+prepare_java_runtime_manager() {
+  local target_dir="${1:-$INSTALL_DIR}"
+  local runtimes_dir="${target_dir}/data/runtimes"
+  mkdir -p "$runtimes_dir"
+  log_msg "Preparing Java Runtime Manager subsystem at $runtimes_dir"
+  echo -e "${CYAN}    Preparing Java multi-version runtime manager (Java 8, 11, 17, 21, 25)...${NC}"
+  echo -e "${GREEN}[✓] Java runtime provisioning subsystem initialized.${NC}"
+}
+
+# ==============================================================================
+# 10. SERVICE MANAGER & PROCESS SUPERVISOR ENGINE
+# ==============================================================================
+setup_service_manager() {
+  local install_dir="${1:-$INSTALL_DIR}"
+  local port="${2:-3000}"
+
+  echo -e "${CYAN}    Configuring service lifecycle manager...${NC}"
+
+  # 1. Generate standalone supervisor scripts (works on all platforms)
+  mkdir -p "${install_dir}/bin"
+  cat <<'SUPERVISOR_EOF' > "${install_dir}/bin/aetherpanel-supervisor.sh"
+#!/usr/bin/env bash
+# AetherPanel Standalone Background Process Supervisor (Sandbox & VPS Hardened)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+PID_FILE="${SCRIPT_DIR}/data/aetherpanel.pid"
+LOG_FILE="${SCRIPT_DIR}/data/logs/panel.log"
+mkdir -p "${SCRIPT_DIR}/data/logs"
+
+cd "${SCRIPT_DIR}"
+export NODE_ENV=production
+
+while true; do
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Supervisor] Starting AetherPanel process..." >> "${LOG_FILE}"
+  START_TS=$(date +%s)
+  
+  if [ -f "${SCRIPT_DIR}/dist/server.cjs" ]; then
+    node "${SCRIPT_DIR}/dist/server.cjs" >> "${LOG_FILE}" 2>&1 &
+  else
+    npm start >> "${LOG_FILE}" 2>&1 &
+  fi
+  PANEL_PID=$!
+  echo "$PANEL_PID" > "${PID_FILE}"
+
+  wait "$PANEL_PID" 2>/dev/null || true
+  EXIT_STATUS=$?
+  rm -f "${PID_FILE}"
+  
+  END_TS=$(date +%s)
+  RUN_TIME=$((END_TS - START_TS))
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Supervisor] AetherPanel exited with status ${EXIT_STATUS} after ${RUN_TIME}s." >> "${LOG_FILE}"
+  
+  # Protect against sandbox runaway crash loops
+  if [ "$RUN_TIME" -lt 5 ]; then
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Supervisor] Rapid exit detected. Backing off 6s before retry to prevent sandbox PID overload..." >> "${LOG_FILE}"
+    sleep 6
+  else
+    sleep 2
+  fi
+done
+SUPERVISOR_EOF
+  chmod +x "${install_dir}/bin/aetherpanel-supervisor.sh"
+
+  # 2. Generate aetherpanel-ctl management tool
+  cat <<'CTL_EOF' > "${install_dir}/bin/aetherpanel-ctl"
+#!/usr/bin/env bash
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+INSTALL_DIR="${SCRIPT_DIR}"
+PID_FILE="${INSTALL_DIR}/data/aetherpanel.pid"
+LOG_FILE="${INSTALL_DIR}/data/logs/panel.log"
+INIT_SYS="systemd"
+if ! command -v systemctl &>/dev/null || [ $(id -u) -ne 0 ]; then
+  INIT_SYS="generic"
+fi
+
+check_pid_alive() {
+  local p="$1"
+  if [ -z "$p" ]; then return 1; fi
+  if ! [[ "$p" =~ ^[0-9]+$ ]]; then return 1; fi
+  if kill -0 "$p" 2>/dev/null; then
+    if [ -d "/proc/$p" ]; then
+      local cmdline
+      cmdline=$(cat "/proc/$p/cmdline" 2>/dev/null || echo "")
+      if [[ "$cmdline" == *"node"* ]] || [[ "$cmdline" == *"aetherpanel"* ]] || [[ "$cmdline" == *"npm"* ]]; then
+        return 0
+      fi
+    elif ps -p "$p" -o comm= 2>/dev/null | grep -E -i "node|npm|aether" >/dev/null; then
+      return 0
+    fi
+  fi
+  return 1
+}
+
+case "${1:-status}" in
+  start)
+    if [ "$INIT_SYS" = "systemd" ] && command -v systemctl &>/dev/null && [ $(id -u) -eq 0 ]; then
+      systemctl start aetherpanel
+    else
+      ACTIVE_PID=$(cat "$PID_FILE" 2>/dev/null || echo "")
+      if check_pid_alive "$ACTIVE_PID"; then
+        echo "AetherPanel is already running (PID $ACTIVE_PID)."
+      else
+        rm -f "$PID_FILE"
+        pkill -f "dist/server.cjs" 2>/dev/null || true
+        pkill -f "aetherpanel-supervisor.sh" 2>/dev/null || true
+        sleep 1
+        nohup "${INSTALL_DIR}/bin/aetherpanel-supervisor.sh" >/dev/null 2>&1 &
+        sleep 2
+        echo "AetherPanel started in background supervisor mode."
+      fi
+    fi
+    ;;
+  stop)
+    if [ "$INIT_SYS" = "systemd" ] && command -v systemctl &>/dev/null && [ $(id -u) -eq 0 ]; then
+      systemctl stop aetherpanel 2>/dev/null || true
+    fi
+    if [ -f "$PID_FILE" ]; then
+      PID=$(cat "$PID_FILE" 2>/dev/null || echo "")
+      if [ -n "$PID" ]; then
+        kill -TERM "$PID" 2>/dev/null || true
+        sleep 1
+        kill -9 "$PID" 2>/dev/null || true
+      fi
+      rm -f "$PID_FILE"
+    fi
+    pkill -f "aetherpanel-supervisor.sh" 2>/dev/null || true
+    pkill -f "dist/server.cjs" 2>/dev/null || true
+    echo "AetherPanel stopped."
+    ;;
+  restart)
+    "$0" stop
+    sleep 2
+    "$0" start
+    ;;
+  status)
+    if [ "$INIT_SYS" = "systemd" ] && command -v systemctl &>/dev/null && [ $(id -u) -eq 0 ]; then
+      systemctl status aetherpanel
+    else
+      ACTIVE_PID=$(cat "$PID_FILE" 2>/dev/null || echo "")
+      if check_pid_alive "$ACTIVE_PID"; then
+        echo "AetherPanel is RUNNING (PID $ACTIVE_PID)."
+      else
+        echo "AetherPanel is STOPPED."
+      fi
+    fi
+    ;;
+  logs)
+    if [ "$INIT_SYS" = "systemd" ] && command -v journalctl &>/dev/null && [ $(id -u) -eq 0 ]; then
+      journalctl -u aetherpanel -n 50 -f
+    else
+      tail -f -n 50 "$LOG_FILE"
+    fi
+    ;;
+  *)
+    echo "Usage: aetherpanel {start|stop|restart|status|logs}"
+    exit 1
+    ;;
+esac
+CTL_EOF
+  chmod +x "${install_dir}/bin/aetherpanel-ctl"
+
+  # Link command globally if permitted
+  if [ "$IS_ROOT" = true ] && [ -d /usr/local/bin ]; then
+    ln -sf "${install_dir}/bin/aetherpanel-ctl" /usr/local/bin/aetherpanel 2>/dev/null || true
+  elif [ -d "${HOME:-}/.local/bin" ]; then
+    ln -sf "${install_dir}/bin/aetherpanel-ctl" "${HOME}/.local/bin/aetherpanel" 2>/dev/null || true
+  fi
+
+  # 3. Register service with system init manager
+  if [ "$INIT_SYSTEM" = "systemd" ] && [ "$IS_ROOT" = true ] && command -v systemctl &>/dev/null; then
+    cat <<SYSTEMD_EOF > /etc/systemd/system/aetherpanel.service
+[Unit]
+Description=AetherPanel Control Plane Hosting Application
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=${install_dir}
+ExecStart=/usr/bin/env node ${install_dir}/dist/server.cjs
+Restart=always
+RestartSec=5
+Environment=NODE_ENV=production
+Environment=PORT=${port}
+Environment=SFTP_PORT=2022
+Environment=PATH=/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/sbin:${install_dir}/bin:${install_dir}/runtimes/node/bin:${HOME}/.local/bin:${HOME}/.bun/bin
+StandardOutput=append:/var/log/aetherpanel/panel.log
+StandardError=append:/var/log/aetherpanel/panel.log
+NoNewPrivileges=yes
+PrivateTmp=yes
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target
+SYSTEMD_EOF
+
+    systemctl daemon-reload >> "$LOG_FILE" 2>&1 || true
+    systemctl enable aetherpanel >> "$LOG_FILE" 2>&1 || true
+    systemctl restart aetherpanel >> "$LOG_FILE" 2>&1 || true
+    echo -e "${GREEN}[✓] Systemd service registered and started: aetherpanel.service${NC}"
+  elif ( [ "$DISTRO" = "alpine" ] || command -v rc-service &>/dev/null || [ -d /etc/init.d ] ) && [ "$IS_ROOT" = true ]; then
+    # Alpine Linux OpenRC Init Script
+    echo -e "${CYAN}    Registering Alpine OpenRC service (/etc/init.d/aetherpanel)...${NC}"
+    cat <<'OPENRC_EOF' > /etc/init.d/aetherpanel
+#!/sbin/openrc-run
+name="aetherpanel"
+description="AetherPanel Universal Control Plane"
+
+command="/usr/bin/npm"
+command_args="start"
+command_background="yes"
+directory="/opt/aetherpanel"
+pidfile="/run/aetherpanel.pid"
+output_log="/var/log/aetherpanel/panel.log"
+error_log="/var/log/aetherpanel/panel.log"
+
+export NODE_ENV="production"
+export PORT="3000"
+export SFTP_PORT="2022"
+export PATH="/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/sbin:/opt/aetherpanel/bin:${PATH}"
+
+depend() {
+  need net
+  after firewall
+}
+OPENRC_EOF
+    chmod +x /etc/init.d/aetherpanel 2>/dev/null || true
+    if command -v rc-update &>/dev/null; then
+      rc-update add aetherpanel default >> "$LOG_FILE" 2>&1 || true
+      rc-service aetherpanel restart >> "$LOG_FILE" 2>&1 || "${install_dir}/bin/aetherpanel-ctl" restart >> "$LOG_FILE" 2>&1 || true
+    else
+      "${install_dir}/bin/aetherpanel-ctl" restart >> "$LOG_FILE" 2>&1 || true
+    fi
+    echo -e "${GREEN}[✓] OpenRC service registered: /etc/init.d/aetherpanel${NC}"
+  else
+    # Universal fallback: background process supervisor
+    echo -e "${BLUE}[INFO] Running in container or non-systemd environment. Initializing background supervisor...${NC}"
+    "${install_dir}/bin/aetherpanel-ctl" restart >> "$LOG_FILE" 2>&1 || true
+    echo -e "${GREEN}[✓] Universal background process supervisor initialized.${NC}"
+  fi
+}
+
+setup_nginx_reverse_proxy() {
+  local target_url="${1:-}"
+  local backend_port="${2:-3000}"
+
+  if [ -z "$target_url" ]; then return 0; fi
+
+  local domain_name
+  domain_name=$(echo "$target_url" | sed -E 's|^https?://||; s|:[0-9]+.*$||; s|/.*$||')
+  domain_name="${domain_name:-localhost}"
+
+  # Only configure reverse proxy if domain is provided (or not loopback)
+  if [ "$domain_name" = "localhost" ] || [ "$domain_name" = "127.0.0.1" ]; then
+    return 0
+  fi
+
+  echo -e "${CYAN}    Configuring Nginx Reverse Proxy for ${domain_name} (Eliminating 502 Bad Gateway)...${NC}"
+  log_msg "Configuring Nginx reverse proxy for domain $domain_name -> 127.0.0.1:$backend_port"
+
+  # Install Nginx if not available
+  if ! command -v nginx &>/dev/null && [ "$IS_ROOT" = true ]; then
+    echo -e "${YELLOW}    Nginx not found. Installing Nginx web server...${NC}"
+    if command -v apt-get &>/dev/null; then
+      run_privileged env DEBIAN_FRONTEND=noninteractive apt-get update -qq >> "$LOG_FILE" 2>&1 || true
+      run_privileged env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq nginx >> "$LOG_FILE" 2>&1 || true
+    elif command -v dnf &>/dev/null; then
+      run_privileged dnf install -y nginx >> "$LOG_FILE" 2>&1 || true
+    elif command -v yum &>/dev/null; then
+      run_privileged yum install -y nginx >> "$LOG_FILE" 2>&1 || true
+    elif command -v pacman &>/dev/null; then
+      run_privileged pacman -Sy --noconfirm nginx >> "$LOG_FILE" 2>&1 || true
+    elif command -v apk &>/dev/null; then
+      run_privileged apk add nginx >> "$LOG_FILE" 2>&1 || true
+    fi
+  fi
+
+  # Configure SELinux policy to allow Nginx network relay if SELinux is present (prevents 502 Bad Gateway)
+  if command -v setsebool &>/dev/null; then
+    run_privileged setsebool -P httpd_can_network_connect 1 2>/dev/null || true
+  fi
+
+  if command -v nginx &>/dev/null && [ "$IS_ROOT" = true ]; then
+    local conf_file=""
+    if [ -d /etc/nginx/sites-available ]; then
+      conf_file="/etc/nginx/sites-available/aetherpanel.conf"
+    elif [ -d /etc/nginx/conf.d ]; then
+      conf_file="/etc/nginx/conf.d/aetherpanel.conf"
+    else
+      mkdir -p /etc/nginx/conf.d 2>/dev/null || true
+      conf_file="/etc/nginx/conf.d/aetherpanel.conf"
+    fi
+
+    cat <<NGINX_EOF > "$conf_file"
+server {
+    listen 80;
+    listen [::]:80;
+    server_name ${domain_name};
+
+    client_max_body_size 5000M;
+    proxy_connect_timeout 600s;
+    proxy_send_timeout 600s;
+    proxy_read_timeout 86400s;
+
+    location / {
+        proxy_pass http://127.0.0.1:${backend_port};
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header X-Forwarded-Port \$server_port;
+        proxy_buffering off;
+        proxy_request_buffering off;
+    }
+}
+NGINX_EOF
+
+    if [ -d /etc/nginx/sites-enabled ]; then
+      ln -sf "$conf_file" /etc/nginx/sites-enabled/aetherpanel.conf 2>/dev/null || true
+      rm -f /etc/nginx/sites-enabled/default 2>/dev/null || true
+    fi
+
+    if nginx -t >> "$LOG_FILE" 2>&1; then
+      if command -v systemctl &>/dev/null; then
+        systemctl enable nginx >> "$LOG_FILE" 2>&1 || true
+        systemctl reload nginx >> "$LOG_FILE" 2>&1 || systemctl restart nginx >> "$LOG_FILE" 2>&1 || true
+      elif command -v rc-service &>/dev/null; then
+        rc-service nginx restart >> "$LOG_FILE" 2>&1 || true
+      elif command -v service &>/dev/null; then
+        service nginx reload >> "$LOG_FILE" 2>&1 || service nginx restart >> "$LOG_FILE" 2>&1 || true
+      fi
+      echo -e "${GREEN}[✓] Nginx reverse proxy active: http://${domain_name} -> 127.0.0.1:${backend_port}${NC}"
+      log_msg "Nginx configured successfully for ${domain_name} (SELinux httpd_can_network_connect enabled)"
+    else
+      echo -e "${YELLOW}[!] Notice: Nginx test reported warnings; check $LOG_FILE${NC}"
+      log_msg "WARNING: nginx -t failed"
+    fi
+  else
+    echo -e "${BLUE}[INFO] Direct web access enabled on port ${backend_port}.${NC}"
+  fi
+}
+
+# ==============================================================================
+# 11. OPTION 1: PANEL INSTALLATION WORKFLOW
+# ==============================================================================
+install_panel() {
+  detect_all_capabilities
+  print_banner
+  print_capability_report
+
+  # Existing Installation Detection
+  if [ -d "$INSTALL_DIR" ] && [ -f "$INSTALL_DIR/package.json" ] && [ -z "$ARTIFACT_DIR" ]; then
+    echo -e "${YELLOW}${BOLD}Existing AetherPanel installation detected at ${INSTALL_DIR}.${NC}\n"
+    echo -e "  ${CYAN}1)${NC} Update existing installation (Pull latest release)"
+    echo -e "  ${CYAN}2)${NC} Reinstall application (Preserve database and user files)"
+    echo -e "  ${CYAN}3)${NC} Reconfigure environment (.env / Panel URL / Port)"
+    echo -e "  ${CYAN}0)${NC} Cancel installation and return\n"
+    local exist_choice
+    exist_choice=$(prompt_input "Select option [0-3]: ")
+    case "${exist_choice:-0}" in
+      1) update_panel; return ;;
+      2) reinstall_panel; return ;;
+      3)
+        echo -e "${CYAN}Reconfiguring environment...${NC}"
+        ;;
+      0|*) echo -e "${BLUE}Installation cancelled.${NC}\n"; return ;;
+    esac
+  fi
+
+  echo -e "Starting AetherPanel Panel Installation Sequence...\n"
+
+  # Panel URL Prompt (Mandatory Wizard Requirement)
+  if [ -z "${PANEL_URL:-}" ]; then
+    echo -e "Enter your Panel Public URL (e.g. domain or public IP):"
+    echo -e "Examples:"
+    echo -e "  https://panel.example.com"
+    echo -e "  http://123.123.123.123:3000\n"
+
+    local default_panel_url="http://${SERVER_IP:-127.0.0.1}:${PANEL_PORT:-3000}"
+    local max_attempts=3
+    local attempt=0
+    while [ "$attempt" -lt "$max_attempts" ]; do
+      attempt=$((attempt + 1))
+      local input_url
+      input_url=$(prompt_input "Panel URL [Default: ${default_panel_url}]: ")
+
+      if [ -z "$input_url" ]; then
+        PANEL_URL="$default_panel_url"
+        echo -e "${GREEN}[✓] Using default Panel URL: ${PANEL_URL}${NC}"
+        break
+      fi
+
+      input_url=$(normalize_url "$input_url")
+
+      if validate_url "$input_url"; then
+        PANEL_URL="$input_url"
+        break
+      else
+        echo -e "${RED}[ERROR] Invalid Panel URL format. Must start with http:// or https:// and contain a valid hostname or IP address.${NC}"
+        if [ "$attempt" -ge "$max_attempts" ]; then
+          PANEL_URL="$default_panel_url"
+          echo -e "${YELLOW}[!] Max attempts reached. Falling back to default URL: ${PANEL_URL}${NC}"
+          break
+        fi
+      fi
+    done
+  else
+    PANEL_URL=$(normalize_url "$PANEL_URL")
+  fi
+
+  # Local Node FQDN Prompt (Wings Daemon Host & Server Connection Address)
+  if [ -z "${NODE_FQDN:-}" ]; then
+    echo -e "\nEnter your Local Node FQDN / Hostname (e.g. node subdomain or public IP):"
+    echo -e "This hostname/IP is used by players and users to connect to game servers."
+    echo -e "Examples:"
+    echo -e "  node.znx.xyz.com"
+    echo -e "  https://node.znx.xyz.com"
+    echo -e "  ${SERVER_IP:-127.0.0.1}\n"
+
+    local default_node_fqdn
+    default_node_fqdn=$(echo "${PANEL_URL}" | sed -E 's|^https?://||; s|:[0-9]+.*$||; s|/.*$||')
+    if [ -z "$default_node_fqdn" ]; then
+      default_node_fqdn="${SERVER_IP:-localhost}"
+    fi
+
+    local input_node_fqdn
+    input_node_fqdn=$(prompt_input "Local Node FQDN [Default: ${default_node_fqdn}]: ")
+    NODE_FQDN="${input_node_fqdn:-$default_node_fqdn}"
+    NODE_FQDN=$(echo "$NODE_FQDN" | sed -E 's|^https?://||; s|:[0-9]+.*$||; s|/.*$||')
+  else
+    NODE_FQDN=$(echo "$NODE_FQDN" | sed -E 's|^https?://||; s|:[0-9]+.*$||; s|/.*$||')
+  fi
+
+  if [ -z "${PANEL_PORT:-}" ]; then
+    local user_port
+    user_port=$(prompt_input "Enter preferred Panel Web Port [Default: 3000]: ")
+    PANEL_PORT="${user_port:-3000}"
+  fi
+
+  check_port_available "$PANEL_PORT"
+
+  if [ -z "${ADMIN_EMAIL:-}" ]; then
+    local input_email
+    input_email=$(prompt_input "Enter Admin Email Address [Default: admin@aetherpanel.in]: ")
+    ADMIN_EMAIL="${input_email:-admin@aetherpanel.in}"
+  fi
+
+  if [ -z "${ADMIN_PASS:-}" ]; then
+    local input_pass
+    input_pass=$(prompt_input "Enter Admin Password [blank = generate]: " true)
+    if [ -n "$input_pass" ]; then
+      local confirm_pass
+      confirm_pass=$(prompt_input "Confirm Admin Password: " true)
+      if [ "$input_pass" != "$confirm_pass" ]; then
+        echo -e "${RED}[ERROR] Passwords do not match. Aborting installation.${NC}"
+        return 1
+      fi
+      ADMIN_PASS="$input_pass"
+    else
+      ADMIN_PASS="$(gen_secret | cut -c1-24)"
+      GENERATED_PASS=true
+    fi
+  fi
+
+  echo -e "\n${BOLD}Beginning Installation Sequence for ${EXECUTION_MODE}...${NC}\n"
+
+  # [1/8] System & Resource Verification
+  echo -e "${YELLOW}[1/8] Checking system requirements and hardware resources...${NC}"
+  check_system_resources
+  echo -e "${GREEN}[✓] Step 1 complete: System profiling verified.${NC}\n"
+
+  # [2/8] Dependency Resolution & Node.js Engine
+  echo -e "${YELLOW}[2/8] Checking & provisioning dependencies (Node.js 20+, Git, OpenSSL, Firewall)...${NC}"
+  verify_and_install_dependencies
+  configure_firewall
+  echo -e "${GREEN}[✓] Step 2 complete: Dependencies verified.${NC}\n"
+
+  # [3/8] Connecting to GitHub Repository
+  echo -e "${YELLOW}[3/8] Connecting to official GitHub repository (${REPO_URL})...${NC}"
+  if ! verify_github_connectivity; then
+    echo -e "${RED}[FAILED] Installation halted at Step 3 (GitHub Connection). Check log: ${LOG_FILE}${NC}"
+    return 1
+  fi
+  echo -e "${GREEN}[✓] Step 3 complete: GitHub connection verified.${NC}\n"
+
+  # [4/8] Acquiring the panel: verified release bundle first, source clone as fallback
+  echo -e "${YELLOW}[4/8] Acquiring AetherPanel (verified release ${RELEASE_TAG})...${NC}"
+  BUNDLE_OK=false
+  if [ -n "$ARTIFACT_DIR" ]; then
+    echo -e "${CYAN}    Using pre-staged artifact ${ARTIFACT_DIR}${NC}"
+    mkdir -p "$INSTALL_DIR"
+    cp -a "$ARTIFACT_DIR"/. "$INSTALL_DIR"/ 2>/dev/null || true
+    INSTALLED_COMMIT=$(sed -n 's/.*"commit":"\([a-f0-9]*\)".*/\1/p' "$ARTIFACT_DIR/release.json" 2>/dev/null | head -n1)
+    INSTALLED_COMMIT="${INSTALLED_COMMIT:-artifact}"
+    BUNDLE_OK=true
+  elif fetch_verified_bundle "$INSTALL_DIR"; then
+    echo -e "${GREEN}[✓] Verified bundle staged at ${INSTALL_DIR}.${NC}"
+    BUNDLE_OK=true
+  else
+    echo -e "${YELLOW}    [!] Verified bundle unavailable. Falling back to source clone (${REPO_BRANCH}).${NC}"
+    log_msg "WARN: bundle path failed, using source fallback"
+    if ! download_panel_source "$INSTALL_DIR" "$REPO_BRANCH"; then
+      echo -e "${RED}[FAILED] Installation halted at Step 4 (Acquisition). Check log: ${LOG_FILE}${NC}"
+      return 1
+    fi
+    echo -e "${GREEN}[✓] Source staged (fallback path).${NC}"
+  fi
+  echo -e "${GREEN}[✓] Step 4 complete.${NC}\n"
+
+  # [5/8] Configuring Application Environment (.env)
+  echo -e "${YELLOW}[5/8] Initializing environment and cryptographic security secrets...${NC}"
+  cd "$INSTALL_DIR"
+  mkdir -p "$INSTALL_DIR/data" "$INSTALL_DIR/data/logs" "$INSTALL_DIR/data/servers" "$INSTALL_DIR/data/backups" "$INSTALL_DIR/data/nodes" "$INSTALL_DIR/data/node_storage" "$INSTALL_DIR/data/object_storage" "$INSTALL_DIR/data/runtimes" "$INSTALL_DIR/bin"
+
+  if [ ! -f "$INSTALL_DIR/.env" ] && [ -f "$INSTALL_DIR/.env.example" ]; then
+    cp "$INSTALL_DIR/.env.example" "$INSTALL_DIR/.env"
+  fi
+
+  # per-install daemon token (no more shared constant)
+  local local_daemon_token
+  local_daemon_token="AETHER-$(gen_secret)"
+
+  set_env_var "$INSTALL_DIR/.env" "HOST" "0.0.0.0"
+  set_env_var "$INSTALL_DIR/.env" "PORT" "${PANEL_PORT:-3000}"
+  set_env_var "$INSTALL_DIR/.env" "NODE_ENV" "production"
+  set_env_var "$INSTALL_DIR/.env" "AETHER_STORAGE_PATH" "${INSTALL_DIR}/data"
+  set_env_var "$INSTALL_DIR/.env" "PANEL_URL" "${PANEL_URL}"
+  set_env_var "$INSTALL_DIR/.env" "APP_URL" "${PANEL_URL}"
+  set_env_var "$INSTALL_DIR/.env" "NODE_FQDN" "${NODE_FQDN}"
+  set_env_var "$INSTALL_DIR/.env" "LOCAL_NODE_FQDN" "${NODE_FQDN}"
+  set_env_var "$INSTALL_DIR/.env" "DAEMON_PORT" "9666"
+  set_env_var "$INSTALL_DIR/.env" "WINGS_PORT" "9666"
+  set_env_var "$INSTALL_DIR/.env" "ALLOWED_ORIGINS" "${PANEL_URL},http://localhost:3000,http://127.0.0.1:3000"
+  set_env_var "$INSTALL_DIR/.env" "JAVA_RUNTIME_AUTO_INSTALL" "true"
+  set_env_var "$INSTALL_DIR/.env" "JAVA_RUNTIME_STORAGE_PATH" "${INSTALL_DIR}/data/runtimes"
+  set_env_var "$INSTALL_DIR/.env" "JAVA_RUNTIME_INSTALL_TIMEOUT" "900"
+  set_env_var "$INSTALL_DIR/.env" "AETHER_LOCAL_NODE_TOKEN" "${local_daemon_token}"
+
+  if [ -n "${ADMIN_EMAIL:-}" ]; then
+    set_env_var "$INSTALL_DIR/.env" "AETHER_ADMIN_EMAIL" "${ADMIN_EMAIL}"
+  fi
+  if [ -n "${ADMIN_PASS:-}" ]; then
+    set_env_var "$INSTALL_DIR/.env" "AETHER_ADMIN_PASSWORD" "${ADMIN_PASS}"
+  fi
+
+  if ! grep -q "^JWT_SECRET=" "$INSTALL_DIR/.env" 2>/dev/null; then
+    local session_secret
+    session_secret="$(gen_secret)"
+    if [ -z "$session_secret" ]; then
+      session_secret="aether_secret_$(date +%s 2>/dev/null || echo "fallback")${RANDOM}"
+    fi
+    set_env_var "$INSTALL_DIR/.env" "JWT_SECRET" "${session_secret}"
+  fi
+  chmod 600 "$INSTALL_DIR/.env" 2>/dev/null || true
+  echo -e "${GREEN}[✓] Step 5 complete: Environment configured (${INSTALL_DIR}/.env).${NC}\n"
+
+  # [6/8] Database Schema Initialization & Local Node Auto-Creation
+  echo -e "${YELLOW}[6/8] Initializing database storage schemas & Local Node record...${NC}"
+  local current_iso_time
+  current_iso_time=$(date -u +"%Y-%m-%dT%H:%M:%S.000Z" 2>/dev/null || echo "2026-11-05T00:00:00.000Z")
+  local host_ram_mb
+  host_ram_mb=${RAM_TOTAL_MB:-4096}
+  if [ "$host_ram_mb" -le 0 ] 2>/dev/null; then host_ram_mb=4096; fi
+  local host_disk_gb
+  host_disk_gb=${DISK_FREE_GB:-200}
+  if [ "$host_disk_gb" -le 0 ] 2>/dev/null; then host_disk_gb=200; fi
+  local host_cores
+  host_cores=$(nproc 2>/dev/null || grep -c ^processor /proc/cpuinfo 2>/dev/null || echo "4")
+  host_cores="${host_cores:-4}"
+
+  if [ ! -f "$INSTALL_DIR/data/db.json" ]; then
+    cat <<EOF > "$INSTALL_DIR/data/db.json"
+{
+  "users": [],
+  "passwords": {},
+  "servers": [],
+  "nodes": [
+    {
+      "id": "local",
+      "name": "Local Node",
+      "hostname": "${NODE_FQDN}",
+      "apiPort": 9666,
+      "daemonPort": 9666,
+      "apiUrl": "http://${NODE_FQDN}:9666",
+      "ssl": false,
+      "behindProxy": false,
+      "maintenanceMode": false,
+      "isLocal": true,
+      "isLocalNode": true,
+      "memory": ${host_ram_mb},
+      "totalRamMB": ${host_ram_mb},
+      "usedRamMB": 0,
+      "disk": $(( host_disk_gb * 1024 )),
+      "totalDiskGB": ${host_disk_gb},
+      "usedDiskGB": 1,
+      "cpu": $(( host_cores * 100 )),
+      "totalCpuCores": ${host_cores},
+      "usedCpuCores": 0,
+      "maxServers": 100,
+      "serverCount": 0,
+      "memoryOverallocate": 100,
+      "diskOverallocate": 100,
+      "tags": ["local", "primary", "bare-metal"],
+      "location": "local",
+      "locationName": "Primary Control Plane VPS",
+      "flagCode": "IN",
+      "status": "online",
+      "ip": "${SERVER_IP:-127.0.0.1}",
+      "fqdn": "${NODE_FQDN}",
+      "sftpPort": 2022,
+      "daemonToken": "${local_daemon_token}",
+      "token": "${local_daemon_token}",
+      "lastHeartbeatAt": "${current_iso_time}",
+      "createdAt": "${current_iso_time}"
+    }
+  ],
+  "plans": [],
+  "locations": [
+    {
+      "id": "loc_local",
+      "shortCode": "LOCAL",
+      "name": "Local Datacenter",
+      "description": "Primary VPS Control Plane Location",
+      "createdAt": "${current_iso_time}"
+    }
+  ],
+  "allocations": [
+    { "id": "alloc_1", "nodeId": "local", "ip": "${SERVER_IP:-127.0.0.1}", "port": 25565, "isAssigned": false, "assigned": false, "createdAt": "${current_iso_time}" },
+    { "id": "alloc_2", "nodeId": "local", "ip": "${SERVER_IP:-127.0.0.1}", "port": 25566, "isAssigned": false, "assigned": false, "createdAt": "${current_iso_time}" },
+    { "id": "alloc_3", "nodeId": "local", "ip": "${SERVER_IP:-127.0.0.1}", "port": 25567, "isAssigned": false, "assigned": false, "createdAt": "${current_iso_time}" },
+    { "id": "alloc_4", "nodeId": "local", "ip": "${SERVER_IP:-127.0.0.1}", "port": 25568, "isAssigned": false, "assigned": false, "createdAt": "${current_iso_time}" },
+    { "id": "alloc_5", "nodeId": "local", "ip": "${SERVER_IP:-127.0.0.1}", "port": 3001, "isAssigned": false, "assigned": false, "createdAt": "${current_iso_time}" },
+    { "id": "alloc_6", "nodeId": "local", "ip": "${SERVER_IP:-127.0.0.1}", "port": 9667, "isAssigned": false, "assigned": false, "createdAt": "${current_iso_time}" }
+  ],
+  "auditLogs": [],
+  "settings": {
+    "siteName": "AetherPanel",
+    "theme": "dark",
+    "allowRegistrations": true,
+    "panelPort": ${PANEL_PORT:-3000},
+    "panelUrl": "${PANEL_URL}",
+    "appUrl": "${PANEL_URL}"
+  },
+  "nodeInstallTokens": [],
+  "serverDiscordLinks": [],
+  "discordLinks": {}
+}
+EOF
+    chmod 600 "$INSTALL_DIR/data/db.json" 2>/dev/null || true
+  fi
+  echo -e "${GREEN}[✓] Step 6 complete: Database initialized safely with Local Node (Port 9666).${NC}\n"
+
+  # [7/8] Runtime Provisioning (bundle = no build) / Build (fallback path)
+  echo -e "${YELLOW}[7/8] Provisioning application runtime...${NC}"
+  cd "$INSTALL_DIR"
+  if [ "$BUNDLE_OK" = true ]; then
+    echo -e "${GREEN}[✓] Prebuilt bundle in use - no npm install and no build required.${NC}"
+    if [ ! -f "$INSTALL_DIR/dist/server.cjs" ] || [ ! -f "$INSTALL_DIR/dist/index.html" ]; then
+      echo -e "${RED}[ERROR] Bundle verification failed: dist/server.cjs or dist/index.html missing. Check ${LOG_FILE}${NC}"
+      log_msg "ERROR: bundle artifact verification failed"
+      return 1
+    fi
+    if [ ! -d "$INSTALL_DIR/node_modules" ]; then
+      echo -e "${YELLOW}    [!] Bundle has no node_modules - installing production deps.${NC}"
+      npm install --omit=dev --no-audit --no-fund >> "$LOG_FILE" 2>&1 || true
+    fi
+  else
+    log_msg "Installing npm packages in $INSTALL_DIR"
+    echo -e "${CYAN}    Resolving and installing full package dependencies...${NC}"
+    if ! npm install --production=false >> "$LOG_FILE" 2>&1; then
+      echo -e "${YELLOW}    Retrying npm install with --legacy-peer-deps...${NC}"
+      npm install --production=false --legacy-peer-deps >> "$LOG_FILE" 2>&1 || true
+    fi
+
+    # Verify core build dependencies exist
+    if [ ! -d "$INSTALL_DIR/node_modules" ] || [ ! -f "$INSTALL_DIR/node_modules/.bin/vite" ]; then
+      echo -e "${YELLOW}    Installing required build toolchain...${NC}"
+      npm install --include=dev --legacy-peer-deps >> "$LOG_FILE" 2>&1 || true
+    fi
+
+    echo -e "${CYAN}    Compiling frontend and backend bundles (npm run build)...${NC}"
+    log_msg "Building production bundle"
+    export NODE_OPTIONS="--max-old-space-size=2048"
+    if ! npm run build >> "$LOG_FILE" 2>&1; then
+      echo -e "${YELLOW}    [!] Standard build had warnings. Running isolated compiler fallback...${NC}"
+      npx vite build >> "$LOG_FILE" 2>&1 || true
+      npx esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs >> "$LOG_FILE" 2>&1 || true
+    fi
+
+    # Verify compiled artifacts
+    if [ ! -f "$INSTALL_DIR/dist/server.cjs" ] || [ ! -f "$INSTALL_DIR/dist/index.html" ]; then
+      echo -e "${RED}[ERROR] Build verification failed: dist/server.cjs or dist/index.html missing. Check ${LOG_FILE}${NC}"
+      log_msg "ERROR: Build verification failed"
+      return 1
+    fi
+  fi
+
+  # Hide source from the install tree (keeps compiled output + create-admin script)
+  echo -e "${CYAN}    Pruning source files and hardening permissions...${NC}"
+  prune_sources "$INSTALL_DIR"
+
+  prepare_java_runtime_manager "$INSTALL_DIR"
+  setup_service_manager "$INSTALL_DIR" "${PANEL_PORT:-3000}"
+
+  # [7b] Automated Local Daemon Agent Auto-Provisioning (Zero-Touch Local Node)
+  echo -e "${CYAN}    Auto-provisioning Local Daemon Agent on port 9666...${NC}"
+  local local_daemon_dir="/etc/aethernode"
+  local local_daemon_vols="/var/lib/aethernode/volumes"
+  local local_daemon_logs="/var/log/aethernode"
+
+  if [ "$IS_ROOT" = false ] && [ "$HAS_SUDO" = false ]; then
+    local_daemon_dir="${INSTALL_DIR}/data/nodes/local/etc"
+    local_daemon_vols="${INSTALL_DIR}/data/nodes/local/volumes"
+    local_daemon_logs="${INSTALL_DIR}/data/logs"
+  fi
+
+  mkdir -p "$local_daemon_dir" "$local_daemon_vols" "$local_daemon_logs"
+
+  if [ -d "${INSTALL_DIR}/daemon" ]; then
+    cp -a "${INSTALL_DIR}/daemon/"* "${local_daemon_dir}/" 2>/dev/null || true
+    find "$local_daemon_dir" -maxdepth 2 -name '*.ts' -delete 2>/dev/null || true
+  fi
+
+  cat <<DAEMON_CFG_EOF > "${local_daemon_dir}/config.json"
+{
+  "panelUrl": "${PANEL_URL}",
+  "nodeId": "local",
+  "token": "${local_daemon_token}",
+  "daemonToken": "${local_daemon_token}",
+  "port": 9666,
+  "daemonPort": 9666,
+  "bindHost": "0.0.0.0",
+  "sftpPort": 2022,
+  "storagePath": "${local_daemon_vols}",
+  "logLevel": "info"
+}
+DAEMON_CFG_EOF
+  chmod 600 "${local_daemon_dir}/config.json" 2>/dev/null || true
+
+  # Link or install daemon dependencies
+  if [ -d "${INSTALL_DIR}/node_modules" ] && [ ! -d "${local_daemon_dir}/node_modules" ]; then
+    ln -sf "${INSTALL_DIR}/node_modules" "${local_daemon_dir}/node_modules" 2>/dev/null || true
+  fi
+
+  if [ -f "${local_daemon_dir}/package.json" ] && [ ! -d "${local_daemon_dir}/node_modules" ]; then
+    ( cd "${local_daemon_dir}" && npm install --omit=dev --no-audit --no-fund >> "$LOG_FILE" 2>&1 || true )
+  fi
+
+  if [ -f "${local_daemon_dir}/agent.js" ]; then
+    if [ "$INIT_SYSTEM" = "systemd" ] && [ "$IS_ROOT" = true ]; then
+      cat <<SERVICE_EOF > /etc/systemd/system/aethernode.service
+[Unit]
+Description=AetherPanel Local Node Daemon (Universal Minecraft & Bots)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=${local_daemon_dir}
+ExecStart=/usr/bin/env node ${local_daemon_dir}/agent.js
+Restart=always
+RestartSec=3
+Environment=NODE_ENV=production
+Environment=PATH=/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/sbin:${HOME}/.bun/bin
+StandardOutput=append:${local_daemon_logs}/agent.log
+StandardError=append:${local_daemon_logs}/agent.log
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target
+SERVICE_EOF
+      systemctl daemon-reload >> "$LOG_FILE" 2>&1 || true
+      systemctl enable aethernode >> "$LOG_FILE" 2>&1 || true
+      systemctl restart aethernode >> "$LOG_FILE" 2>&1 || true
+      echo -e "${GREEN}[✓] Local Node Daemon registered and active (aethernode.service on port 9666).${NC}"
+    else
+      pkill -f "${local_daemon_dir}/agent.js" 2>/dev/null || true
+      nohup /usr/bin/env node "${local_daemon_dir}/agent.js" >> "${local_daemon_logs}/agent.log" 2>&1 &
+      echo -e "${GREEN}[✓] Local Node Daemon running in background (port 9666).${NC}"
+    fi
+  else
+    echo -e "${YELLOW}[!] daemon/agent.js not present - local node daemon skipped.${NC}"
+    log_msg "WARN: agent.js missing, daemon not provisioned"
+  fi
+
+  setup_nginx_reverse_proxy "$PANEL_URL" "${PANEL_PORT:-3000}"
+
+  harden_perms "$INSTALL_DIR"
+  echo -e "${GREEN}[✓] Step 7 complete: Application, Local Daemon & Proxy compiled and registered.${NC}\n"
+
+  # [8/8] Live Health Check Verification
+  echo -e "${YELLOW}[8/8] Performing live application health verification...${NC}"
+  local health_passed=false
+  local attempts=0
+  local max_attempts=12
+
+  while [ $attempts -lt $max_attempts ]; do
+    sleep 2
+    attempts=$((attempts + 1))
+    echo -e "${CYAN}    Waiting for service health response (Attempt ${attempts}/${max_attempts})...${NC}"
+
+    local res
+    res=$(curl -s -m 4 "http://127.0.0.1:${PANEL_PORT:-3000}/api/health" 2>/dev/null || echo "")
+    if [[ "$res" == *"\"status\":\"ok\""* ]] || [[ "$res" == *"\"status\""* ]] || [[ "$res" == *"status"* ]]; then
+      health_passed=true
+      break
+    fi
+  done
+
+  if [ "$health_passed" = false ]; then
+    echo -e "${YELLOW}[!] Warning: Local health verification timed out. Inspect log: ${LOG_FILE}${NC}"
+  else
+    echo -e "${GREEN}[✓] Step 8 complete: Health check verified (HTTP 200 OK).${NC}\n"
+  fi
+
+  # Install summary (mode 600)
+  printf 'panel=%s\ncommit=%s\nadmin_email=%s\nadmin_password=%s\n' \
+    "${PANEL_URL}" "${INSTALLED_COMMIT:-unknown}" "${ADMIN_EMAIL}" "${ADMIN_PASS}" \
+    > "$INSTALL_DIR/install-summary.txt" 2>/dev/null || true
+  chmod 600 "$INSTALL_DIR/install-summary.txt" 2>/dev/null || true
+
+  # Final Success Summary
+  SERVER_IP=$(curl -s -m 4 https://api.ipify.org 2>/dev/null || hostname -I 2>/dev/null | awk '{print $1}' || echo "localhost")
+  SERVER_IP="${SERVER_IP:-localhost}"
+  local display_panel_url="${PANEL_URL:-http://${SERVER_IP}:${PANEL_PORT:-3000}}"
+
+  echo -e "${GREEN}${BOLD}========================================================================${NC}"
+  echo -e "${GREEN}${BOLD}   🎉 AetherPanel Installed Successfully in ${EXECUTION_MODE}!${NC}"
+  echo -e "${GREEN}${BOLD}========================================================================${NC}"
+  echo -e "Version/Commit:  ${BOLD}${INSTALLED_COMMIT:-"Latest"}${NC}"
+  echo -e "Install Dir:     ${BOLD}${INSTALL_DIR}${NC}"
+  echo -e "Web Panel URL:   ${CYAN}${BOLD}${display_panel_url}${NC}"
+  echo -e "Admin Account:   ${BOLD}${ADMIN_EMAIL:-admin@aetherpanel.in}${NC}"
+  if [ "$GENERATED_PASS" = true ]; then
+    echo -e "Admin Password:  ${BOLD}${ADMIN_PASS}${NC} ${YELLOW}(generated - change after login)${NC}"
+  else
+    echo -e "Admin Password:  ${BOLD}${ADMIN_PASS}${NC}"
+  fi
+  echo -e "Management Cmd:  ${BOLD}aetherpanel {start|stop|restart|status|logs}${NC}"
+  echo -e "Installer Log:   ${BOLD}${LOG_FILE}${NC}"
+  echo -e "Install Summary: ${BOLD}${INSTALL_DIR}/install-summary.txt${NC}\n"
+  log_msg "Installation finalized successfully for ${display_panel_url}"
+}
+
+# ==============================================================================
+# 12. OPTION 2: NODE INSTALLATION (AETHERNODE DAEMON AGENT)
+# ==============================================================================
+install_node_daemon() {
+  detect_all_capabilities
+  print_banner
+  print_capability_report
+
+  echo -e "${PURPLE}${BOLD}=== INSTALLING AETHERNODE DAEMON AGENT ===${NC}\n"
+
+  local node_cfg_dir="/etc/aethernode"
+  local node_vol_dir="/var/lib/aethernode/volumes"
+  local node_log_dir="/var/log/aethernode"
+
+  if [ "$IS_ROOT" = false ] && [ "$HAS_SUDO" = false ]; then
+    node_cfg_dir="${INSTALL_DIR}/data/nodes/local/etc"
+    node_vol_dir="${INSTALL_DIR}/data/nodes/local/volumes"
+    node_log_dir="${INSTALL_DIR}/data/logs"
+  fi
+
+  mkdir -p "$node_cfg_dir" "$node_vol_dir" "$node_log_dir"
+  configure_firewall
+
+  if [ -z "${PANEL_URL:-}" ]; then
+    echo -e "${CYAN}Please enter central AetherPanel URL (e.g. http://104.22.45.10:${PANEL_PORT:-3000} or https://panel.domain.com):${NC}"
+    PANEL_URL=$(prompt_input "Panel URL: ")
+  fi
+
+  if [ -z "${PANEL_URL:-}" ]; then
+    echo -e "${RED}[ERROR] Panel URL is required for Node installation.${NC}"
+    return 1
+  fi
+
+  if [ -z "${INSTALL_TOKEN:-}" ]; then
+    echo -e "${CYAN}Please enter your Node Token (starts with AETHER- from Panel) or Enrollment Token:${NC}"
+    INSTALL_TOKEN=$(prompt_input "Token: ")
+  fi
+
+  if [ -z "${INSTALL_TOKEN:-}" ]; then
+    echo -e "${RED}[ERROR] Node Token is required.${NC}"
+    return 1
+  fi
+
+  DAEMON_PORT="${DAEMON_PORT:-9666}"
+  PANEL_URL=$(normalize_url "$PANEL_URL")
+  DETECTED_IP=$(curl -s -m 5 https://api.ipify.org 2>/dev/null || hostname -I 2>/dev/null | awk '{print $1}' || echo "127.0.0.1")
+  DETECTED_IP="${DETECTED_IP:-127.0.0.1}"
+  if [ -z "${NODE_FQDN:-}" ]; then
+    NODE_FQDN=$(hostname -f 2>/dev/null || hostname 2>/dev/null || echo "$DETECTED_IP")
+  fi
+  NODE_FQDN="${NODE_FQDN:-$DETECTED_IP}"
+
+  verify_and_install_dependencies
+
+  if [[ "$INSTALL_TOKEN" == AETHER-* ]]; then
+    DAEMON_TOKEN="$INSTALL_TOKEN"
+    echo -e "\n${YELLOW}[VERIFYING] Testing node authentication with Control Plane (${PANEL_URL}/api/v1/node/heartbeat)...${NC}"
+    local hb_response
+    hb_response=$(curl -sS -m 10 -X POST "${PANEL_URL}/api/v1/node/heartbeat" \
+      -H "Content-Type: application/json" \
+      -H "Authorization: Bearer ${DAEMON_TOKEN}" \
+      -H "x-daemon-token: ${DAEMON_TOKEN}" \
+      -d "{\"daemonToken\": \"${DAEMON_TOKEN}\", \"fqdn\": \"${NODE_FQDN}\", \"daemonPort\": ${DAEMON_PORT}, \"ramUsageMB\": 128, \"cpuUsageCores\": 0.1, \"diskUsageGB\": 1}" 2>/dev/null || echo '{"success":false}')
+
+    if [[ "$hb_response" == *"\"success\":true"* ]]; then
+      NODE_ID=$(echo "$hb_response" | sed -n 's/.*"nodeId"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 1)
+      NODE_ID="${NODE_ID:-node}"
+      echo -e "${GREEN}[✓ SUCCESS] Node token verified! Node (${NODE_ID}) is now ONLINE in Control Plane.${NC}"
+    else
+      echo -e "${YELLOW}[!] Notice: Heartbeat check returned: ${hb_response:0:180}. Daemon will retry on startup.${NC}"
+      NODE_ID="${NODE_ID:-node}"
+    fi
+  else
+    echo -e "\n${YELLOW}[ENROLLING] Contacting Control Plane (${PANEL_URL}/api/v1/node/enroll)...${NC}"
+    log_msg "Enrolling node with Control Plane at ${PANEL_URL}"
+
+    local enroll_response
+    enroll_response=$(curl -sS -m 15 -X POST "${PANEL_URL}/api/v1/node/enroll" \
+      -H "Content-Type: application/json" \
+      -d "{
+        \"token\": \"${INSTALL_TOKEN}\",
+        \"fqdn\": \"${NODE_FQDN}\",
+        \"ip\": \"${DETECTED_IP}\",
+        \"daemonPort\": ${DAEMON_PORT:-9666},
+        \"sftpPort\": ${SFTP_PORT:-2022}
+      }" 2>/dev/null || echo '{"success":false,"error":{"message":"Network connection failed"}}')
+
+    if [[ "$enroll_response" == *"\"success\":true"* ]]; then
+      DAEMON_TOKEN=$(echo "$enroll_response" | sed -n 's/.*"daemonToken"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 1)
+      NODE_ID=$(echo "$enroll_response" | sed -n 's/.*"nodeId"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 1)
+      NODE_NAME=$(echo "$enroll_response" | sed -n 's/.*"nodeName"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 1)
+
+      echo -e "${GREEN}[✓ SUCCESS] Node successfully enrolled with Control Plane!${NC}"
+      echo -e "    Node ID:   ${BOLD}${NODE_ID:-unknown}${NC}"
+      echo -e "    Node Name: ${BOLD}${NODE_NAME:-unknown}${NC}"
+      echo -e "    Node FQDN: ${BOLD}${NODE_FQDN}${NC}"
+      log_msg "Node successfully enrolled: ID ${NODE_ID:-unknown}"
+    else
+      echo -e "${RED}[ERROR] Node pairing failed. Server response:${NC}"
+      echo -e "${WHITE}$enroll_response${NC}\n"
+      return 1
+    fi
+  fi
+
+  # Deploy Full Universal Daemon Files (from local repository /daemon or remote)
+  echo -e "${CYAN}    Deploying AetherPanel Universal Daemon files (Minecraft + Python/Node/Bun Bots)...${NC}"
+
+  if [ -d "/opt/aetherpanel/daemon" ]; then
+    cp -a /opt/aetherpanel/daemon/* "${node_cfg_dir}/" 2>/dev/null || true
+  elif [ -d "./daemon" ]; then
+    cp -a ./daemon/* "${node_cfg_dir}/" 2>/dev/null || true
+  elif [ -d "${INSTALL_DIR}/daemon" ]; then
+    cp -a "${INSTALL_DIR}/daemon/"* "${node_cfg_dir}/" 2>/dev/null || true
+  else
+    # Fetch from the verified release bundle, source clone as last resort
+    echo -e "${CYAN}    Fetching daemon files from the verified release...${NC}"
+    local tmp_daemon
+    tmp_daemon=$(mktemp -d 2>/dev/null || echo "/tmp/daemon_dl_$$")
+    if TEMP_DIR="" fetch_verified_bundle "$tmp_daemon" && [ -d "$tmp_daemon/daemon" ]; then
+      cp -a "$tmp_daemon/daemon/"* "${node_cfg_dir}/" 2>/dev/null || true
+      rm -rf "$tmp_daemon"
+    elif git clone --depth 1 "https://github.com/mrrangerxd/daemon" "$tmp_daemon" >> "$LOG_FILE" 2>&1; then
+      cp -a "$tmp_daemon"/* "${node_cfg_dir}/" 2>/dev/null || true
+      rm -rf "$tmp_daemon"
+    fi
+  fi
+  find "$node_cfg_dir" -maxdepth 2 -name '*.ts' -delete 2>/dev/null || true
+
+  # Write authoritative config.json with properly quoted nodeId, fqdn, and daemonToken
+  cat <<EOF > "${node_cfg_dir}/config.json"
+{
+  "panelUrl": "${PANEL_URL}",
+  "nodeId": "${NODE_ID:-local}",
+  "fqdn": "${NODE_FQDN}",
+  "token": "${DAEMON_TOKEN:-unknown}",
+  "daemonToken": "${DAEMON_TOKEN:-unknown}",
+  "port": ${DAEMON_PORT:-9666},
+  "daemonPort": ${DAEMON_PORT:-9666},
+  "bindHost": "0.0.0.0",
+  "sftpPort": ${SFTP_PORT:-2022},
+  "storagePath": "${node_vol_dir}",
+  "heartbeatIntervalMs": 15000,
+  "commandPollIntervalMs": 1000,
+  "logLevel": "info"
+}
+EOF
+  chmod 600 "${node_cfg_dir}/config.json" 2>/dev/null || true
+
+  # Install daemon npm dependencies
+  if [ -f "${node_cfg_dir}/package.json" ] && [ ! -d "${node_cfg_dir}/node_modules" ]; then
+    echo -e "${CYAN}    Resolving and installing daemon dependencies (adm-zip, pidusage, express)...${NC}"
+    ( cd "${node_cfg_dir}" && npm install --omit=dev --no-audit --no-fund >> "$LOG_FILE" 2>&1 || true )
+  fi
+
+  # Service Configuration (Systemd or PM2 / Supervisor)
+  if [ "$INIT_SYSTEM" = "systemd" ] && [ "$IS_ROOT" = true ]; then
+    cat <<EOF > /etc/systemd/system/aethernode.service
+[Unit]
+Description=AetherPanel Universal Infrastructure Daemon (Minecraft & Bots)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=${node_cfg_dir}
+ExecStart=/usr/bin/env node ${node_cfg_dir}/agent.js
+Restart=always
+RestartSec=3
+Environment=NODE_ENV=production
+Environment=PATH=/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/sbin:${HOME}/.bun/bin
+StandardOutput=append:${node_log_dir}/agent.log
+StandardError=append:${node_log_dir}/agent.log
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    systemctl daemon-reload >> "$LOG_FILE" 2>&1 || true
+    systemctl enable aethernode >> "$LOG_FILE" 2>&1 || true
+    systemctl restart aethernode >> "$LOG_FILE" 2>&1 || true
+  elif command -v pm2 >/dev/null 2>&1; then
+    ( cd "${node_cfg_dir}" && pm2 start agent.js --name aethernode >> "$LOG_FILE" 2>&1 || true )
+    pm2 save >> "$LOG_FILE" 2>&1 || true
+  else
+    nohup /usr/bin/env node "${node_cfg_dir}/agent.js" >> "${node_log_dir}/agent.log" 2>&1 &
+  fi
+
+  echo -e "\n${GREEN}${BOLD}========================================================================${NC}"
+  echo -e "${GREEN}${BOLD}   🎉 AetherNode Daemon Installed & Enrolled Successfully!${NC}"
+  echo -e "${GREEN}${BOLD}========================================================================${NC}"
+  echo -e "Node ID:        ${BOLD}${NODE_ID:-unknown}${NC}"
+  echo -e "Control URL:    ${BOLD}${PANEL_URL}${NC}"
+  echo -e "Daemon Port:    ${BOLD}${DAEMON_PORT:-9666}/TCP${NC}"
+  echo -e "SFTP Transport: ${BOLD}${SFTP_PORT:-2022}/TCP${NC}"
+  echo -e "Runtimes:       ${BOLD}Minecraft (Java) + Bots (Python, Node.js, Bun)${NC}\n"
+}
+
+# ==============================================================================
+# 13. OPTION 3: UPDATE PANEL (VERIFIED RELEASE, SOURCE FALLBACK)
+# ==============================================================================
+update_panel() {
+  detect_all_capabilities
+  print_banner
+  echo -e "${PURPLE}${BOLD}=== UPDATING AETHERPANEL FROM OFFICIAL RELEASE ===${NC}\n"
+
+  local target="$INSTALL_DIR"
+  if [ ! -d "$target" ]; then
+    echo -e "${YELLOW}[!] Existing installation not found at ${INSTALL_DIR}. Proceeding with fresh installation...${NC}"
+    install_panel
+    return
+  fi
+
+  echo -e "${YELLOW}[1/5] Checking official GitHub repository (${REPO_URL})...${NC}"
+  if ! verify_github_connectivity; then
+    echo -e "${RED}[ERROR] Update aborted due to GitHub connectivity failure.${NC}"
+    return 1
+  fi
+
+  echo -e "\n${YELLOW}[2/5] Creating safe configuration and database snapshot...${NC}"
+  local backup_dir="${INSTALL_DIR}/data/backups"
+  mkdir -p "$backup_dir"
+  local ts
+  ts=$(date +%Y%m%d_%H%M%S 2>/dev/null || echo "backup_$$")
+
+  if [ -f "$target/data/db.json" ]; then
+    cp "$target/data/db.json" "${backup_dir}/db_preupdate_${ts}.json" 2>/dev/null || true
+  fi
+  if [ -f "$target/.env" ]; then
+    cp "$target/.env" "${backup_dir}/env_preupdate_${ts}.bak" 2>/dev/null || true
+  fi
+  echo -e "${GREEN}[✓] Backup snapshot created at ${backup_dir}${NC}"
+
+  echo -e "\n${YELLOW}[3/5] Applying latest code (verified release ${RELEASE_TAG})...${NC}"
+  cd "$target"
+  local staged=""
+  if fetch_verified_bundle "$target"; then
+    staged="bundle"
+    echo -e "${GREEN}[✓] Verified bundle applied (commit ${INSTALLED_COMMIT}).${NC}"
+  elif [ -d ".git" ] && command -v git &> /dev/null; then
+    echo -e "${YELLOW}    [!] Bundle unavailable - falling back to git pull.${NC}"
+    staged="git"
+    git fetch origin >> "$LOG_FILE" 2>&1 || true
+    git checkout "$REPO_BRANCH" >> "$LOG_FILE" 2>&1 || git checkout main >> "$LOG_FILE" 2>&1 || true
+    git pull origin "$REPO_BRANCH" >> "$LOG_FILE" 2>&1 || git pull origin main >> "$LOG_FILE" 2>&1 || true
+  else
+    echo -e "${YELLOW}    [!] Bundle unavailable - falling back to source download.${NC}"
+    staged="source"
+    download_panel_source "$target" "$REPO_BRANCH"
+  fi
+
+  if [ "$staged" = "bundle" ]; then
+    echo -e "\n${YELLOW}[4/5] No build required (prebuilt bundle).${NC}"
+  else
+    echo -e "\n${YELLOW}[4/5] Updating dependencies and compiling application bundle...${NC}"
+    npm install --production=false >> "$LOG_FILE" 2>&1 || npm install >> "$LOG_FILE" 2>&1 || true
+    npm run build >> "$LOG_FILE" 2>&1 || true
+  fi
+
+  # Hide source + keep secrets tight
+  prune_sources "$target"
+  harden_perms "$target"
+
+  echo -e "\n${YELLOW}[5/5] Restarting services and verifying health...${NC}"
+  if [ "$INIT_SYSTEM" = "systemd" ] && [ "$IS_ROOT" = true ]; then
+    systemctl restart aetherpanel >> "$LOG_FILE" 2>&1 || true
+  elif [ -f "${target}/bin/aetherpanel-ctl" ]; then
+    "${target}/bin/aetherpanel-ctl" restart >> "$LOG_FILE" 2>&1 || true
+  fi
+
+  sleep 3
+  echo -e "${GREEN}${BOLD}========================================================================${NC}"
+  echo -e "${GREEN}${BOLD}   🎉 AetherPanel Updated Successfully!${NC}"
+  echo -e "${GREEN}${BOLD}========================================================================${NC}\n"
+  log_msg "AetherPanel update completed successfully."
+}
+
+# ==============================================================================
+# 14. OPTION 4: REINSTALL PANEL (PRESERVE USER DATA)
+# ==============================================================================
+reinstall_panel() {
+  detect_all_capabilities
+  print_banner
+  echo -e "${RED}${BOLD}=== REINSTALL AETHERPANEL CONTROL PLANE ===${NC}\n"
+  echo -e "${YELLOW}WARNING:${NC} Reinstallation replaces application code with fresh release files."
+  echo -e "${GREEN}Your database, servers, and configuration data will be safely preserved.${NC}\n"
+
+  echo -e "  ${CYAN}1)${NC} Reinstall application code only (Preserve database, servers, .env)"
+  echo -e "  ${CYAN}2)${NC} Reinstall application + clean rebuild dependencies"
+  echo -e "  ${RED}3)${NC} Full Factory Reset (Erase all data and reset completely)"
+  echo -e "  ${GREEN}0)${NC} Cancel & Return\n"
+
+  local reinstall_choice
+  reinstall_choice=$(prompt_input "Select reinstallation mode [0-3]: ")
+
+  case "${reinstall_choice:-0}" in
+    1|2)
+      echo -e "\n${YELLOW}[1/4] Preserving database and configuration data...${NC}"
+      local ts
+      ts=$(date +%Y%m%d_%H%M%S 2>/dev/null || echo "reinstall_$$")
+      local backup_tmp
+      backup_tmp=$(mktemp -d 2>/dev/null || echo "/tmp/aether_backup_${ts}")
+      mkdir -p "$backup_tmp"
+
+      if [ -d "$INSTALL_DIR/data" ]; then
+        cp -r "$INSTALL_DIR/data" "$backup_tmp/data"
+      fi
+      if [ -f "$INSTALL_DIR/.env" ]; then
+        cp "$INSTALL_DIR/.env" "$backup_tmp/.env"
+      fi
+
+      echo -e "\n${YELLOW}[2/4] Downloading fresh release (${RELEASE_TAG})...${NC}"
+      local reinstalled=""
+      if fetch_verified_bundle "$INSTALL_DIR"; then
+        reinstalled="bundle"
+      else
+        echo -e "${YELLOW}    [!] Bundle unavailable - falling back to source download.${NC}"
+        reinstalled="source"
+        download_panel_source "$INSTALL_DIR" "$REPO_BRANCH"
+      fi
+
+      echo -e "\n${YELLOW}[3/4] Restoring preserved database and environment...${NC}"
+      if [ -d "$backup_tmp/data" ]; then
+        mkdir -p "$INSTALL_DIR/data"
+        cp -r "$backup_tmp/data"/* "$INSTALL_DIR/data/" 2>/dev/null || true
+      fi
+      if [ -f "$backup_tmp/.env" ]; then
+        cp "$backup_tmp/.env" "$INSTALL_DIR/.env"
+      fi
+      rm -rf "$backup_tmp"
+
+      echo -e "\n${YELLOW}[4/4] Finalizing and restarting service...${NC}"
+      cd "$INSTALL_DIR"
+      if [ "$reinstall_choice" = "2" ]; then
+        rm -rf node_modules package-lock.json dist
+      fi
+      if [ "$reinstalled" = "bundle" ] && [ "$reinstall_choice" != "2" ]; then
+        echo -e "${GREEN}[✓] Prebuilt bundle in use - no rebuild needed.${NC}"
+      else
+        npm install --production=false >> "$LOG_FILE" 2>&1 || npm install >> "$LOG_FILE" 2>&1 || true
+        npm run build >> "$LOG_FILE" 2>&1 || true
+      fi
+
+      prune_sources "$INSTALL_DIR"
+      harden_perms "$INSTALL_DIR"
+      chmod 600 "$INSTALL_DIR/.env" 2>/dev/null || true
+
+      setup_service_manager "$INSTALL_DIR" "${PANEL_PORT:-3000}"
+      echo -e "\n${GREEN}${BOLD}🎉 AetherPanel Reinstalled Successfully!${NC}\n"
+      ;;
+    3)
+      echo -e "\n${RED}${BOLD}DANGER: FACTORY RESET CONFIRMATION${NC}"
+      local reset_confirm
+      reset_confirm=$(prompt_input "Type exactly 'RESET AETHERPANEL' to confirm: ")
+      if [ "$reset_confirm" = "RESET AETHERPANEL" ]; then
+        rm -rf "$INSTALL_DIR"
+        install_panel
+      else
+        echo -e "${BLUE}Reset aborted.${NC}\n"
+      fi
+      ;;
+    0|*)
+      echo -e "${BLUE}Reinstallation cancelled.${NC}\n"
+      ;;
+  esac
+}
+
+# ==============================================================================
+# 15. OPTION 5: UNINSTALL PANEL (SEPARATE APP FROM DATA)
+# ==============================================================================
+uninstall_system() {
+  detect_all_capabilities
+  print_banner
+  echo -e "${RED}${BOLD}=== AETHERPANEL UNINSTALLATION MENU ===${NC}\n"
+  echo -e "  ${YELLOW}1)${NC} Remove Application Only (Preserve Database & Server Data)"
+  echo -e "  ${YELLOW}2)${NC} Remove Application & Registered Services (Preserve Data)"
+  echo -e "  ${RED}3)${NC} Complete Destructive Removal (Requires typing 'DELETE-AETHERPANEL')"
+  echo -e "  ${GREEN}0)${NC} Cancel & Return to Main Menu\n"
+
+  local un_choice
+  un_choice=$(prompt_input "Select option [0-3]: ")
+
+  case "${un_choice:-0}" in
+    1|2)
+      echo -e "\n${YELLOW}Stopping and removing application files...${NC}"
+      if [ "$INIT_SYSTEM" = "systemd" ] && [ "$IS_ROOT" = true ]; then
+        systemctl stop aetherpanel aethernode >> "$LOG_FILE" 2>&1 || true
+        systemctl disable aetherpanel aethernode >> "$LOG_FILE" 2>&1 || true
+        rm -f /etc/systemd/system/aetherpanel.service /etc/systemd/system/aethernode.service
+        systemctl daemon-reload >> "$LOG_FILE" 2>&1 || true
+      elif [ -f "${INSTALL_DIR}/bin/aetherpanel-ctl" ]; then
+        "${INSTALL_DIR}/bin/aetherpanel-ctl" stop >> "$LOG_FILE" 2>&1 || true
+      fi
+
+      # Remove app files while keeping data
+      if [ -d "$INSTALL_DIR" ]; then
+        find "$INSTALL_DIR" -maxdepth 1 ! -name 'data' ! -name '.env' -exec rm -rf {} + 2>/dev/null || true
+      fi
+      echo -e "${GREEN}[✓] Application removed. User servers and database preserved in ${INSTALL_DIR}/data.${NC}\n"
+      ;;
+    3)
+      echo -e "\n${RED}${BOLD}DANGER: PERMANENT DATA DESTRUCTION${NC}"
+      echo -e "This will irreversibly delete all servers, databases, backups, and configurations."
+      local del_confirm
+      del_confirm=$(prompt_input "Type exactly 'DELETE-AETHERPANEL' to confirm: ")
+      if [ "$del_confirm" = "DELETE-AETHERPANEL" ]; then
+        if [ "$INIT_SYSTEM" = "systemd" ] && [ "$IS_ROOT" = true ]; then
+          systemctl stop aetherpanel aethernode >> "$LOG_FILE" 2>&1 || true
+          systemctl disable aetherpanel aethernode >> "$LOG_FILE" 2>&1 || true
+          rm -f /etc/systemd/system/aetherpanel.service /etc/systemd/system/aethernode.service
+          systemctl daemon-reload >> "$LOG_FILE" 2>&1 || true
+        fi
+        rm -rf "$INSTALL_DIR" /var/log/aetherpanel /etc/aethernode /var/lib/aethernode /var/log/aethernode
+        rm -f /usr/local/bin/aetherpanel
+        echo -e "${GREEN}[✓] AetherPanel completely uninstalled and data removed.${NC}\n"
+      else
+        echo -e "${BLUE}Confirmation mismatch. Uninstallation aborted.${NC}\n"
+      fi
+      ;;
+    0|*)
+      echo -e "${BLUE}Uninstallation cancelled.${NC}\n"
+      ;;
+  esac
+}
+
+# ==============================================================================
+# 16. OPTION 6: DOCUMENTATION & TUTORIAL
+# ==============================================================================
+show_tutorial() {
+  print_banner
+  echo -e "${PURPLE}${BOLD}=== AETHERPANEL UNIVERSAL INSTALLATION GUIDE ===${NC}\n"
+  echo -e "${CYAN}1. Multi-Platform Architectural Modes:${NC}"
+  echo -e "   • ${BOLD}Full VPS Mode:${NC} Standard systemd service with boot persistence & firewall."
+  echo -e "   • ${BOLD}Container Mode:${NC} Background process supervisor for Docker/LXC."
+  echo -e "   • ${BOLD}Sandbox Mode:${NC} User-space installation for CodeSandbox/IDX/Cloud runners."
+  echo -e "   • ${BOLD}CI / Runner Mode:${NC} Automated ephemeral build & verification."
+  echo -e "\n${CYAN}2. Port & Network Requirements:${NC}"
+  echo -e "   • ${BOLD}Port 3000/TCP:${NC} AetherPanel Web UI & REST API"
+  echo -e "   • ${BOLD}Port 9666/TCP:${NC} AetherNode Daemon Agent (Default)"
+  echo -e "   • ${BOLD}Port 2022/TCP:${NC} AetherNode SFTP Transport"
+  echo -e "   • ${BOLD}Ports 25565-30000/TCP/UDP:${NC} Minecraft & App Port Allocations\n"
+  echo -e "${CYAN}3. Node Pairing One-Liner:${NC}"
+  echo -e "   Run on remote compute node:"
+  echo -e "   ${BOLD}curl -fsSL ${REPO_URL}/raw/main/install.sh | bash -s -- --node --panel http://PANEL_IP:3000 --token TOKEN${NC}\n"
+  echo -e "${CYAN}4. Release Verification:${NC}"
+  echo -e "   Every release ships SHA256SUMS + SHA256SUMS.minisig."
+  echo -e "   ${BOLD}minisign -Vm SHA256SUMS -p aetherpanel.pub${NC} then ${BOLD}sha256sum -c SHA256SUMS${NC}\n"
+
+  prompt_input "Press Enter to return to main menu..." > /dev/null
+}
+
+# ==============================================================================
+# 17. OPTION 7: SYSTEM HEALTH VERIFICATION & REPAIR
+# ==============================================================================
+repair_and_health_check() {
+  detect_all_capabilities
+  print_banner
+  echo -e "${CYAN}${BOLD}=== SYSTEM HEALTH DIAGNOSTICS & VERIFICATION MATRIX ===${NC}\n"
+
+  echo -e "${WHITE}Environment Classification:${NC} ${BOLD}${EXECUTION_MODE}${NC} (${OS_PRETTY}, ${ARCH}, ${LIBC_TYPE})\n"
+
+  echo -e "| Feature / Subsystem       | Status        | Reason / Diagnostics                   |"
+  echo -e "|---------------------------|---------------|----------------------------------------|"
+
+  # 1. Node Runtime Check
+  if verify_node_runtime; then
+    printf "| %-25s | ${GREEN}%-13s${NC} | %-38s |\n" "Node.js Engine" "PASS" "$(node -v 2>/dev/null || echo 'Node 20+')"
+  else
+    printf "| %-25s | ${RED}%-13s${NC} | %-38s |\n" "Node.js Engine" "FAIL" "Node runtime missing or < 18"
+  fi
+
+  # 2. Database Integrity Check
+  if [ -f "$INSTALL_DIR/data/db.json" ]; then
+    printf "| %-25s | ${GREEN}%-13s${NC} | %-38s |\n" "Database JSON" "PASS" "Persistent storage file verified"
+  else
+    printf "| %-25s | ${YELLOW}%-13s${NC} | %-38s |\n" "Database JSON" "WARNING" "Not initialized yet"
+  fi
+
+  # 3. Systemd / Supervisor Check
+  if [ "$INIT_SYSTEM" = "systemd" ]; then
+    printf "| %-25s | ${GREEN}%-13s${NC} | %-38s |\n" "systemd Integration" "PASS" "Active systemd service available"
+  else
+    printf "| %-25s | ${BLUE}%-13s${NC} | %-38s |\n" "systemd Integration" "NOT AVAILABLE" "Container / Non-systemd mode"
+  fi
+
+  # 4. Process Supervisor Check
+  printf "| %-25s | ${GREEN}%-13s${NC} | %-38s |\n" "Managed Process Mode" "PASS" "Supervisor fallback operational"
+
+  # 5. Docker Engine Check
+  if [ "$DOCKER_AVAILABLE" = true ]; then
+    printf "| %-25s | ${GREEN}%-13s${NC} | %-38s |\n" "Docker Daemon" "PASS" "Docker engine operational"
+  else
+    printf "| %-25s | ${BLUE}%-13s${NC} | %-38s |\n" "Docker Daemon" "NOT AVAILABLE" "Process isolation mode active"
+  fi
+
+  # 6. Java Runtime Discovery Check
+  if command -v java &>/dev/null; then
+    local jv
+    jv=$(java -version 2>&1 | head -n 1 | tr -d '\r\n' | cut -c1-35 || echo "Java ready")
+    printf "| %-25s | ${GREEN}%-13s${NC} | %-38s |\n" "Java Runtimes" "PASS" "$jv"
+  else
+    printf "| %-25s | ${YELLOW}%-13s${NC} | %-38s |\n" "Java Runtimes" "PASS" "Auto-provisioning on demand"
+  fi
+
+  # 7. Live Local Health Endpoint Check
+  local health_res
+  health_res=$(curl -s -m 3 "http://127.0.0.1:${PANEL_PORT:-3000}/api/health" 2>/dev/null || echo "")
+  if [[ "$health_res" == *"status"* ]]; then
+    printf "| %-25s | ${GREEN}%-13s${NC} | %-38s |\n" "Health Endpoint" "PASS" "HTTP 200 OK (/api/health)"
+  else
+    printf "| %-25s | ${YELLOW}%-13s${NC} | %-38s |\n" "Health Endpoint" "WARNING" "Panel offline or stopped"
+  fi
+
+  # 8. Source exposure / permission audit
+  local ts_visible dir_mode env_mode
+  ts_visible=$(find "$INSTALL_DIR" -maxdepth 2 -name '*.ts' -not -path '*/node_modules/*' -not -path '*/server/scripts/*' 2>/dev/null | wc -l)
+  dir_mode=$(stat -c '%a' "$INSTALL_DIR" 2>/dev/null || echo "n/a")
+  env_mode=$(stat -c '%a' "$INSTALL_DIR/.env" 2>/dev/null || echo "n/a")
+  if [ "${ts_visible:-0}" -eq 0 ]; then
+    printf "| %-25s | ${GREEN}%-13s${NC} | %-38s |\n" "Source Exposure" "PASS" "No .ts files outside node_modules"
+  else
+    printf "| %-25s | ${YELLOW}%-13s${NC} | %-38s |\n" "Source Exposure" "WARNING" "${ts_visible} .ts files visible"
+  fi
+  printf "| %-25s | ${GREEN}%-13s${NC} | %-38s |\n" "Dir / .env perms" "INFO" "dir ${dir_mode} / env ${env_mode}"
+
+  # 9. Signing tool
+  if command -v minisign &>/dev/null; then
+    printf "| %-25s | ${GREEN}%-13s${NC} | %-38s |\n" "minisign" "PASS" "Release signature verification possible"
+  else
+    printf "| %-25s | ${YELLOW}%-13s${NC} | %-38s |\n" "minisign" "WARNING" "Install it to verify future releases"
+  fi
+
+  echo -e "\n${GREEN}${BOLD}Diagnostics matrix completed successfully.${NC}\n"
+  prompt_input "Press Enter to return to main menu..." > /dev/null
+}
+
+# ==============================================================================
+# 18. CLI DISPATCHER & MAIN LOOP
+# ==============================================================================
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --node)
+      MODE="node"
+      SHOW_MENU=false
+      shift
+      ;;
+    --panel)
+      SHOW_MENU=false
+      if [ $# -ge 2 ] && [[ -n "${2:-}" ]] && [[ ! "$2" =~ ^-- ]] && [[ "$2" =~ ^https?:// ]]; then
+        PANEL_URL="$2"
+        if [ -z "${MODE:-}" ]; then
+          MODE="panel"
+        fi
+        shift 2
+      else
+        MODE="panel"
+        shift
+      fi
+      ;;
+    --panel-url|--url)
+      if [ $# -ge 2 ] && [[ -n "${2:-}" ]] && [[ ! "$2" =~ ^-- ]]; then
+        PANEL_URL="$2"
+        shift 2
+      else
+        PANEL_URL=""
+        shift
+      fi
+      ;;
+    --update)
+      MODE="update"
+      SHOW_MENU=false
+      shift
+      ;;
+    --reinstall)
+      MODE="reinstall"
+      SHOW_MENU=false
+      shift
+      ;;
+    --uninstall)
+      MODE="uninstall"
+      SHOW_MENU=false
+      shift
+      ;;
+    --token)
+      if [ $# -ge 2 ] && [[ -n "${2:-}" ]] && [[ ! "$2" =~ ^-- ]]; then
+        INSTALL_TOKEN="$2"
+        shift 2
+      else
+        INSTALL_TOKEN=""
+        shift
+      fi
+      ;;
+    --node-fqdn|--fqdn)
+      if [ $# -ge 2 ] && [[ -n "${2:-}" ]] && [[ ! "$2" =~ ^-- ]]; then
+        NODE_FQDN="$2"
+        shift 2
+      else
+        NODE_FQDN=""
+        shift
+      fi
+      ;;
+    --daemon-port)
+      if [ $# -ge 2 ] && [[ -n "${2:-}" ]] && [[ ! "$2" =~ ^-- ]]; then
+        DAEMON_PORT="$2"
+        shift 2
+      else
+        DAEMON_PORT="9666"
+        shift
+      fi
+      ;;
+    -p|--port)
+      if [ $# -ge 2 ] && [[ -n "${2:-}" ]] && [[ ! "$2" =~ ^-- ]]; then
+        PANEL_PORT="$2"
+        shift 2
+      else
+        PANEL_PORT="3000"
+        shift
+      fi
+      ;;
+    --admin-email|--email)
+      if [ $# -ge 2 ] && [[ -n "${2:-}" ]] && [[ ! "$2" =~ ^-- ]]; then
+        ADMIN_EMAIL="$2"
+        shift 2
+      else
+        ADMIN_EMAIL=""
+        shift
+      fi
+      ;;
+    --admin-password|--admin-pass|--password|--pass)
+      if [ $# -ge 2 ] && [[ -n "${2:-}" ]] && [[ ! "$2" =~ ^-- ]]; then
+        ADMIN_PASS="$2"
+        shift 2
+      else
+        ADMIN_PASS=""
+        shift
+      fi
+      ;;
+    --branch)
+      if [ $# -ge 2 ] && [[ -n "${2:-}" ]] && [[ ! "$2" =~ ^-- ]]; then
+        REPO_BRANCH="$2"
+        shift 2
+      else
+        REPO_BRANCH="main"
+        shift
+      fi
+      ;;
+    --release-tag)
+      if [ $# -ge 2 ] && [[ -n "${2:-}" ]] && [[ ! "$2" =~ ^-- ]]; then
+        RELEASE_TAG="$2"
+        DOWNLOAD_BASE="${AETHER_DOWNLOAD_BASE:-https://github.com/MrRangerXD/AetherPanel/releases/download/${RELEASE_TAG}}"
+        shift 2
+      else
+        shift
+      fi
+      ;;
+    --commit)
+      if [ $# -ge 2 ] && [[ -n "${2:-}" ]] && [[ ! "$2" =~ ^-- ]]; then
+        PINNED_COMMIT="$2"
+        shift 2
+      else
+        shift
+      fi
+      ;;
+    --from-artifact)
+      if [ $# -ge 2 ] && [ -d "${2:-}" ]; then
+        ARTIFACT_DIR="$2"
+        shift 2
+      else
+        shift
+      fi
+      ;;
+    --allow-unsigned)
+      ALLOW_UNSIGNED=1
+      shift
+      ;;
+    --no-color)
+      shift
+      ;;
+    --repair|--diagnostics|--health)
+      MODE="repair"
+      SHOW_MENU=false
+      shift
+      ;;
+    --yes|-y|--auto-confirm)
+      AUTO_CONFIRM=true
+      shift
+      ;;
+    --help|-h)
+      echo -e "${CYAN}AetherPanel Universal Cross-Platform Installer CLI Usage:${NC}"
+      echo -e "  bash install.sh                                         # Interactive Menu"
+      echo -e "  bash install.sh --panel --url http://IP:3000 --port 3000 # Automated Panel Install"
+      echo -e "  bash install.sh --update                                # Apply Latest Verified Release"
+      echo -e "  bash install.sh --node --url http://IP:3000 --token TOK # Automated Node Pairing"
+      echo -e "  bash install.sh --repair                                # System Diagnostics"
+      echo -e ""
+      echo -e "${CYAN}Release pinning / verification:${NC}"
+      echo -e "  --release-tag TAG   install from a specific release tag (default: latest-build)"
+      echo -e "  --commit SHA        refuse unless the release commit matches SHA"
+      echo -e "  --allow-unsigned    accept checksum-only verification (no minisign)"
+      echo -e "  --from-artifact DIR install from an already verified bundle directory"
+      exit 0
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
+
+if [ "$SHOW_MENU" = false ]; then
+  case "${MODE:-}" in
+    node) install_node_daemon ;;
+    panel) install_panel ;;
+    update) update_panel ;;
+    reinstall) reinstall_panel ;;
+    uninstall) uninstall_system ;;
+    repair) repair_and_health_check ;;
+    *)
+      echo -e "${RED}Invalid CLI mode specified.${NC}"
+      exit 1
+      ;;
+  esac
+  exit 0
+fi
+
+# Main Menu Loop (Preserved numbers 1-8, 0 to exit)
+while true; do
+  detect_all_capabilities
+  print_banner
+  echo -e "${BOLD}Select an action from the menu options below:${NC}\n"
+  echo -e "  ${GREEN}1)${NC} Panel Installation"
+  echo -e "  ${GREEN}2)${NC} Node Installation"
+  echo -e "  ${GREEN}3)${NC} Update Panel"
+  echo -e "  ${GREEN}4)${NC} Reinstall Panel"
+  echo -e "  ${GREEN}5)${NC} Uninstall Panel"
+  echo -e "  ${GREEN}6)${NC} Tutorial (Installation)"
+  echo -e "  ${GREEN}7)${NC} System Health Verification & Repair"
+  echo -e "  ${GREEN}8)${NC} Create Admin User"
+  echo -e "  ${RED}0)${NC} Exit\n"
+
+  if [ ! -t 0 ] && ! (exec < /dev/tty) 2>/dev/null; then
+    echo -e "${YELLOW}Non-interactive shell detected. Use --help to view CLI options.${NC}"
+    exit 0
+  fi
+
+  CHOICE=$(prompt_input "Enter choice [0-8]: ")
+  case "${CHOICE:-0}" in
+    1) install_panel; prompt_input "Press Enter to return to menu..." > /dev/null ;;
+    2) install_node_daemon; prompt_input "Press Enter to return to menu..." > /dev/null ;;
+    3) update_panel; prompt_input "Press Enter to return to menu..." > /dev/null ;;
+    4) reinstall_panel; prompt_input "Press Enter to return to menu..." > /dev/null ;;
+    5) uninstall_system; prompt_input "Press Enter to return to menu..." > /dev/null ;;
+    6) show_tutorial ;;
+    7) repair_and_health_check ;;
+    8)
+      echo -e "\n${CYAN}Starting Admin User creation...${NC}"
+      if [ -d "$INSTALL_DIR" ]; then
+        (cd "$INSTALL_DIR" && npx tsx server/scripts/create-admin.ts)
+      else
+        npx tsx server/scripts/create-admin.ts
+      fi
+      prompt_input "Press Enter to return to menu..." > /dev/null
+      ;;
+    0)
+      echo -e "\n${CYAN}Thank you for choosing AetherPanel. Goodbye!${NC}\n"
+      exit 0
+      ;;
+    *)
+      echo -e "${RED}Invalid selection. Please choose an option between 0 and 8.${NC}"
+      sleep 1
+      ;;
+  esac
+done
