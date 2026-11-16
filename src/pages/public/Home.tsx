@@ -316,11 +316,11 @@ export const Home: React.FC<HomeProps> = ({ onNavigate }) => {
       <section id="pricing" className="scroll-mt-14">
         <div id="plans-showcase" className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-20">
           <ScrollReveal>
-            <div className="rounded-lg bg-[var(--color-surface)] border border-[var(--color-line)] p-6 sm:p-8">
+            <div className="rounded-lg bg-[var(--color-surface-1)] border border-[var(--border-1)] shadow-[var(--shadow-1)] p-5 sm:p-5">
               
               {/* Category Tabs */}
               <div className="flex justify-center mb-8">
-                <div className="inline-flex p-1 rounded-md bg-[var(--color-surface-2)] border border-[var(--color-line)]">
+                <div className="segmented-control">
                   {availableCategories.map((cat) => {
                     const isActive = activeCategoryTab === cat.id;
                     const cleanName = cat.name.replace(/\s*Hosting\s*$/i, '');
@@ -329,9 +329,10 @@ export const Home: React.FC<HomeProps> = ({ onNavigate }) => {
                         key={cat.id}
                         type="button"
                         onClick={() => setActiveCategoryTab(cat.id)}
-                        className={`px-4 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer ${
+                        aria-pressed={isActive}
+                        className={`px-4 py-1.5 text-xs font-medium transition-colors cursor-pointer ${
                           isActive
-                            ? 'bg-[var(--color-surface-3)] text-[var(--color-ink)] border border-[var(--color-line)]'
+                            ? 'text-[var(--color-ink)]'
                             : 'text-[var(--color-ink-mute)] hover:text-[var(--color-ink)]'
                         }`}
                       >
@@ -465,7 +466,7 @@ export const Home: React.FC<HomeProps> = ({ onNavigate }) => {
                             {activeSelectedPlan.name}
                           </h3>
                           {activeSelectedPlan.priceMonthly === 0 && (
-                            <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-semibold bg-[var(--color-ok)]/10 text-[var(--color-ok)] border border-[var(--color-ok)]/30">
+                            <span className="badge badge-success">
                               FREE
                             </span>
                           )}

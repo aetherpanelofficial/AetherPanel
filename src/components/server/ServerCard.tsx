@@ -80,10 +80,10 @@ export const ServerCard: React.FC<ServerCardProps> = ({ server, onNavigate, onPo
 
   // Status badge styling per tokens
   const statusColor = isRunning
-    ? 'border-[var(--color-ok)]/40 bg-[var(--color-ok)]/10 text-[var(--color-ok)]'
+    ? 'badge-success'
     : isStarting
-    ? 'border-[var(--color-warn)]/40 bg-[var(--color-warn)]/10 text-[var(--color-warn)]'
-    : 'border-[var(--color-line)] bg-[var(--color-surface-2)] text-[var(--color-ink-mute)]';
+    ? 'badge-warning'
+    : '';
 
   return (
     <div
@@ -115,7 +115,7 @@ export const ServerCard: React.FC<ServerCardProps> = ({ server, onNavigate, onPo
             )}
           </div>
 
-          <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[9px] font-mono font-semibold border tracking-wider uppercase ${statusColor}`}>
+          <span className={`badge ${statusColor}`}>
             <span className={`h-1.5 w-1.5 rounded-full ${isRunning ? 'bg-[var(--color-ok)]' : isStarting ? 'bg-[var(--color-warn)]' : 'bg-[var(--color-ink-mute)]'}`} />
             <span>{server.status}</span>
           </span>

@@ -110,7 +110,7 @@ export const Login: React.FC<LoginProps> = ({ onNavigate }) => {
         </div>
 
         {/* Card */}
-        <div className="rounded-lg border border-[var(--color-line)] bg-[var(--color-surface)] p-6 space-y-4">
+        <div className="rounded-xl border-0 bg-[var(--color-surface-1)] p-8 shadow-[var(--shadow-2)] space-y-4">
           {error && (
             <div className="p-3 rounded-md bg-[var(--color-err)]/10 border border-[var(--color-err)]/30 text-xs text-[var(--color-err)] flex flex-col gap-1.5" role="alert">
               <div className="flex items-start gap-2">
@@ -141,7 +141,7 @@ export const Login: React.FC<LoginProps> = ({ onNavigate }) => {
                   id="btn_google_signin"
                   onClick={handleGoogleSignIn}
                   disabled={googleLoading || discordLoading || loading}
-                  className="w-full flex items-center justify-center gap-2.5 px-3 h-9 rounded-md bg-[var(--color-surface-2)] border border-[var(--color-line)] hover:bg-[var(--color-surface-3)] text-xs font-medium text-[var(--color-ink)] transition-colors active:scale-[0.985] disabled:opacity-50 cursor-pointer"
+                  className="btn btn-secondary w-full h-9 text-xs disabled:opacity-50"
                 >
                   {googleLoading ? (
                     <Loader2 className="w-3.5 h-3.5 animate-spin text-[var(--color-ink-mute)]" />
@@ -163,7 +163,7 @@ export const Login: React.FC<LoginProps> = ({ onNavigate }) => {
                   id="btn_discord_signin"
                   onClick={handleDiscordSignIn}
                   disabled={discordLoading || googleLoading || loading}
-                  className="w-full flex items-center justify-center gap-2.5 px-3 h-9 rounded-md bg-[var(--color-surface-2)] border border-[var(--color-line)] hover:bg-[var(--color-surface-3)] text-xs font-medium text-[var(--color-ink)] transition-colors active:scale-[0.985] disabled:opacity-50 cursor-pointer"
+                  className="btn btn-secondary w-full h-9 text-xs disabled:opacity-50"
                 >
                   {discordLoading ? (
                     <Loader2 className="w-3.5 h-3.5 animate-spin text-[var(--color-ink-mute)]" />
@@ -248,7 +248,7 @@ export const Login: React.FC<LoginProps> = ({ onNavigate }) => {
           )}
 
           {authConfig.registrationEnabled && (
-            <div className="text-center pt-2 text-xs text-[var(--color-ink-mute)] border-t border-[var(--color-line)]">
+            <div className="text-center pt-2 text-xs text-[var(--color-ink-mute)]">
               No account yet?{' '}
               <button
                 onClick={() => onNavigate('register')}

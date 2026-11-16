@@ -156,10 +156,12 @@ export function ServerConsoleTab({ server, onRefreshServer, onPowerAction, hideH
 
   // Server IP Endpoint calculation
   const serverAddress = useMemo(() => {
+    const resolvedEndpoint = (server as any).resolvedPublicEndpoint;
+    if (isMinecraft && resolvedEndpoint) return String(resolvedEndpoint);
     const host = server.primaryIp || (server as any).ip || '127.0.0.1';
-    const port = server.primaryPort || (server as any).port || 25565;
-    return `${host}:${port}`;
-  }, [server.primaryIp, server.primaryPort]);
+    const port = server.primaryPort || (server as any).port || (isMinecraft ? 25565 : 0);
+    return port ? `${host}:${port}` : '';
+  }, [server.primaryIp, server.primaryPort, isMinecraft, (server as any).resolvedPublicEndpoint]);
 
   // Handle 1-click address copy
   const handleCopyAddress = () => {
@@ -544,7 +546,7 @@ export function ServerConsoleTab({ server, onRefreshServer, onPowerAction, hideH
 
   // Real Metric Values for the 7 Stat Cards
   const realCpuPercent = liveData?.cpuPercent ?? server.cpuUsage ?? 0;
-  const maxCpuPercent = server.limits?.cpuCores ? server.limits.cpuCores * 100 : 100;
+  const maxCpuPercent = 100;
   
   const realUsedRamMB = liveData?.usedRamMB ?? server.ramUsageMB ?? 0;
   const realTotalRamMB = liveData?.totalRamMB ?? server.limits?.ramMB ?? 1024;
@@ -627,6 +629,7 @@ export function ServerConsoleTab({ server, onRefreshServer, onPowerAction, hideH
                   : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-600/20 active:scale-95 cursor-pointer'
               }`}
               title="Start Server"
+              aria-label="Start server"
             >
               <Play className="h-4 w-4 fill-white" />
             </button>
@@ -641,6 +644,7 @@ export function ServerConsoleTab({ server, onRefreshServer, onPowerAction, hideH
                   : 'bg-amber-500 hover:bg-amber-400 text-black shadow-lg shadow-amber-500/20 active:scale-95 cursor-pointer'
               }`}
               title="Restart Server"
+              aria-label="Restart server"
             >
               <RotateCw className="h-4 w-4" />
             </button>
@@ -655,6 +659,7 @@ export function ServerConsoleTab({ server, onRefreshServer, onPowerAction, hideH
                   : 'bg-rose-600 hover:bg-rose-500 text-white shadow-lg shadow-rose-600/20 active:scale-95 cursor-pointer'
               }`}
               title="Stop Server"
+              aria-label="Stop server"
             >
               <Square className="h-4 w-4 fill-white" />
             </button>
@@ -669,6 +674,7 @@ export function ServerConsoleTab({ server, onRefreshServer, onPowerAction, hideH
                   : 'bg-red-950 hover:bg-red-900 border border-red-700/60 text-red-400 shadow-lg active:scale-95 cursor-pointer'
               }`}
               title="Kill Process (Force Stop)"
+              aria-label="Force stop server process"
             >
               <Power className="h-4 w-4" />
             </button>
@@ -683,10 +689,10 @@ export function ServerConsoleTab({ server, onRefreshServer, onPowerAction, hideH
         {/* Left Column: Terminal Console Window */}
         <div className="col-span-1 lg:col-span-3 space-y-3">
           {/* Console Top Control Toolbar */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-2.5 rounded-xl bg-[#14151b] border border-[#23252e]">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-2.5 rounded-xl bg-[var(--color-surface-2)] border border-[var(--color-line)]">
             <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
               {/* Connection Status Indicator */}
-              <div className="flex items-center gap-2 px-2.5 py-1 rounded-lg bg-[#0c0d12] border border-[#23252e] text-xs font-mono">
+              <div className="flex items-center gap-2 px-2.5 py-1 rounded-lg bg-[var(--color-surface-0)] border border-[var(--color-line)] text-xs font-mono">
                 <span className="text-neutral-500">Socket:</span>
                 {wsStatus === 'CONNECTED' && (
                   <span className="flex items-center gap-1.5 text-emerald-400 font-medium">
@@ -721,7 +727,7 @@ export function ServerConsoleTab({ server, onRefreshServer, onPowerAction, hideH
               </div>
 
               {/* Buffer Length Indicator */}
-              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#0c0d12] border border-[#23252e] text-xs font-mono">
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--color-surface-0)] border border-[var(--color-line)] text-xs font-mono">
                 <span className="text-neutral-500">Buffer:</span>
                 <span className="text-neutral-200 font-semibold">{logs.length}</span>
                 <span className="text-neutral-500 hidden xs:inline">/ {MAX_BUFFER_LINES}</span>
@@ -730,6 +736,23 @@ export function ServerConsoleTab({ server, onRefreshServer, onPowerAction, hideH
 
             {/* Quick Actions (Search, Copy, Download, Clear) */}
             <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                aria-label={isAutoScroll ? 'Disable console autoscroll' : 'Enable console autoscroll'}
+                aria-pressed={isAutoScroll}
+                onClick={() => {
+                  const enabled = !isAutoScrollRef.current;
+                  isAutoScrollRef.current = enabled;
+                  setIsAutoScroll(enabled);
+                  if (enabled) {
+                    setUnreadCount(0);
+                    scrollConsoleToBottom();
+                  }
+                }}
+                className={`px-2 py-1 rounded-lg border text-[10px] font-mono transition-colors ${isAutoScroll ? 'border-[var(--color-accent)] text-[var(--color-accent)] bg-[var(--color-surface-2)]' : 'border-[var(--color-line)] text-[var(--color-ink-dim)]'}`}
+              >
+                Autoscroll {isAutoScroll ? 'On' : 'Off'}
+              </button>
               <div className="relative flex-1 sm:flex-none">
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-neutral-500" />
                 <input
@@ -737,14 +760,15 @@ export function ServerConsoleTab({ server, onRefreshServer, onPowerAction, hideH
                   value={filterQuery}
                   onChange={(e) => setFilterQuery(e.target.value)}
                   placeholder="Filter logs..."
-                  className="w-full sm:w-44 pl-8 pr-2.5 py-1 rounded-lg bg-[#0c0d12] border border-[#23252e] text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-[#f97316] transition-colors font-mono"
+                  className="w-full sm:w-44 pl-8 pr-2.5 py-1 rounded-lg bg-[var(--color-surface-0)] border border-[var(--color-line)] text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-[var(--color-accent)] transition-colors font-mono"
                 />
               </div>
 
               <button
                 onClick={handleCopyLogs}
                 title="Copy Terminal Logs"
-                className="p-1.5 rounded-lg bg-[#0c0d12] hover:bg-[#181920] border border-[#23252e] text-neutral-400 hover:text-white transition-colors cursor-pointer shrink-0"
+                aria-label="Copy terminal logs"
+                className="p-1.5 rounded-lg bg-[var(--color-surface-0)] hover:bg-[var(--color-surface-2)] border border-[var(--color-line)] text-neutral-400 hover:text-white transition-colors cursor-pointer shrink-0"
               >
                 {copied ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
               </button>
@@ -752,7 +776,8 @@ export function ServerConsoleTab({ server, onRefreshServer, onPowerAction, hideH
               <button
                 onClick={handleDownloadLogs}
                 title="Download Logs"
-                className="p-1.5 rounded-lg bg-[#0c0d12] hover:bg-[#181920] border border-[#23252e] text-neutral-400 hover:text-white transition-colors cursor-pointer shrink-0"
+                aria-label="Download logs"
+                className="p-1.5 rounded-lg bg-[var(--color-surface-0)] hover:bg-[var(--color-surface-2)] border border-[var(--color-line)] text-neutral-400 hover:text-white transition-colors cursor-pointer shrink-0"
               >
                 <Download className="h-3.5 w-3.5" />
               </button>
@@ -760,7 +785,8 @@ export function ServerConsoleTab({ server, onRefreshServer, onPowerAction, hideH
               <button
                 onClick={handleClearLogs}
                 title="Clear View"
-                className="p-1.5 rounded-lg bg-[#0c0d12] hover:bg-rose-950/40 hover:border-rose-500/40 border border-[#23252e] text-neutral-400 hover:text-rose-400 transition-colors cursor-pointer shrink-0"
+                aria-label="Clear console view"
+                className="p-1.5 rounded-lg bg-[var(--color-surface-0)] hover:bg-rose-950/40 hover:border-rose-500/40 border border-[var(--color-line)] text-neutral-400 hover:text-rose-400 transition-colors cursor-pointer shrink-0"
               >
                 <Trash2 className="h-3.5 w-3.5" />
               </button>
@@ -771,9 +797,10 @@ export function ServerConsoleTab({ server, onRefreshServer, onPowerAction, hideH
                   connectWebSocket();
                 }}
                 title="Reconnect Stream"
-                className="p-1.5 rounded-lg bg-[#0c0d12] hover:bg-[#181920] border border-[#23252e] text-neutral-400 hover:text-[#f97316] transition-colors cursor-pointer shrink-0"
+                aria-label="Reconnect console stream"
+                className="p-1.5 rounded-lg bg-[var(--color-surface-0)] hover:bg-[var(--color-surface-2)] border border-[var(--color-line)] text-neutral-400 hover:text-[var(--color-accent)] transition-colors cursor-pointer shrink-0"
               >
-                <RotateCw className={`h-3.5 w-3.5 ${wsStatus === 'CONNECTING' || wsStatus === 'RECONNECTING' ? 'animate-spin text-[#f97316]' : ''}`} />
+                <RotateCw className={`h-3.5 w-3.5 ${wsStatus === 'CONNECTING' || wsStatus === 'RECONNECTING' ? 'animate-spin text-[var(--color-accent)]' : ''}`} />
               </button>
             </div>
           </div>
@@ -786,7 +813,7 @@ export function ServerConsoleTab({ server, onRefreshServer, onPowerAction, hideH
               onScroll={handleScroll}
               tabIndex={0}
               style={{ overscrollBehavior: 'contain' }}
-              className="rounded-xl border border-[#23252e] bg-[#0c0d12] p-4 font-mono text-xs text-neutral-200 h-[460px] sm:h-[500px] overflow-y-auto overflow-x-auto space-y-0.5 focus:outline-none focus:border-[#f97316]"
+              className="rounded-xl border border-[var(--color-line)] bg-[var(--color-surface-0)] p-4 font-mono text-xs text-neutral-200 h-[460px] sm:h-[500px] overflow-y-auto overflow-x-auto space-y-0.5 focus:outline-none focus:border-[var(--color-accent)]"
             >
               {filteredLogs.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-center p-6 text-neutral-500 space-y-2 select-none">
@@ -794,7 +821,9 @@ export function ServerConsoleTab({ server, onRefreshServer, onPowerAction, hideH
                   {filterQuery ? (
                     <div>
                       <p className="font-semibold text-neutral-300 text-xs">No matching log lines found.</p>
-                      <p className="text-[11px] text-neutral-500">Try adjusting or clearing your search filter query.</p>
+                      <button type="button" onClick={() => setFilterQuery('')} className="mt-2 text-[11px] font-semibold text-[var(--color-accent)] underline">
+                        Clear log search
+                      </button>
                     </div>
                   ) : isStarting ? (
                     <div className="space-y-1">
@@ -826,7 +855,7 @@ export function ServerConsoleTab({ server, onRefreshServer, onPowerAction, hideH
                       {onPowerAction && (
                         <button
                           onClick={() => onPowerAction('start')}
-                          className="mt-2 inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#f97316] hover:bg-[#ea580c] text-white text-xs font-semibold shadow-sm transition-all cursor-pointer"
+                          className="mt-2 inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white text-xs font-semibold shadow-sm transition-all cursor-pointer"
                         >
                           <Play className="h-3 w-3 fill-current" />
                           <span>Start Server</span>
@@ -841,7 +870,7 @@ export function ServerConsoleTab({ server, onRefreshServer, onPowerAction, hideH
                   return (
                     <div
                       key={idx}
-                      className={`leading-relaxed whitespace-pre font-mono text-[11px] w-max min-w-full ${colorClass} hover:bg-[#181920]/60 px-1 rounded transition-colors`}
+                      className={`leading-relaxed whitespace-pre font-mono text-[11px] w-max min-w-full ${colorClass} hover:bg-[var(--color-surface-2)]/60 px-1 rounded transition-colors`}
                     >
                       {cleaned}
                     </div>
@@ -855,7 +884,7 @@ export function ServerConsoleTab({ server, onRefreshServer, onPowerAction, hideH
               <button
                 type="button"
                 onClick={handleJumpToBottom}
-                className="absolute bottom-4 right-4 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#f97316] text-white font-medium text-xs transition-colors z-10 cursor-pointer shadow-lg"
+                className="absolute bottom-4 right-4 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--color-accent)] text-white font-medium text-xs transition-colors z-10 cursor-pointer shadow-lg"
               >
                 <ArrowDown className="h-3 w-3" />
                 <span>{unreadCount > 0 ? `↓ ${unreadCount} New` : 'Scroll to bottom'}</span>
@@ -881,7 +910,7 @@ export function ServerConsoleTab({ server, onRefreshServer, onPowerAction, hideH
                       ? 'Server is starting... input queued'
                       : 'Server is offline. Start server to send commands.'
                   }
-                  className="w-full pl-7 pr-16 py-2.5 rounded-xl bg-[#0c0d12] border border-[#23252e] text-xs font-mono text-white placeholder-neutral-500 focus:outline-none focus:border-[#f97316] transition-colors"
+                  className="w-full pl-7 pr-16 py-2.5 rounded-xl bg-[var(--color-surface-0)] border border-[var(--color-line)] text-xs font-mono text-white placeholder-neutral-500 focus:outline-none focus:border-[var(--color-accent)] transition-colors"
                 />
                 {lastAck && (
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-1.5 py-0.5 rounded hidden xs:inline-flex items-center gap-1">
@@ -893,7 +922,7 @@ export function ServerConsoleTab({ server, onRefreshServer, onPowerAction, hideH
               <button
                 type="submit"
                 disabled={!command.trim() || (!isRunning && !isStarting) || isSubmitting}
-                className="px-4 py-2.5 rounded-xl bg-[#f97316] hover:bg-[#ea580c] disabled:opacity-50 text-white text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 cursor-pointer shrink-0"
+                className="px-4 py-2.5 rounded-xl bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] disabled:opacity-50 text-white text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 cursor-pointer shrink-0"
               >
                 {isSubmitting ? (
                   <RotateCw className="h-3.5 w-3.5 animate-spin" />
@@ -915,7 +944,7 @@ export function ServerConsoleTab({ server, onRefreshServer, onPowerAction, hideH
                     disabled={!isRunning}
                     onClick={() => handleSendCommand(undefined, q.cmd)}
                     title={q.desc}
-                    className="px-2 py-0.5 rounded-lg bg-[#14151b] border border-[#23252e] hover:border-[#f97316] text-neutral-400 hover:text-white transition-colors cursor-pointer text-[10px] font-mono disabled:opacity-40"
+                    className="px-2 py-0.5 rounded-lg bg-[var(--color-surface-2)] border border-[var(--color-line)] hover:border-[var(--color-accent)] text-neutral-400 hover:text-white transition-colors cursor-pointer text-[10px] font-mono disabled:opacity-40"
                   >
                     {q.label}
                   </button>
@@ -936,17 +965,19 @@ export function ServerConsoleTab({ server, onRefreshServer, onPowerAction, hideH
         ───────────────────────────────────────────────────────────────────────── */}
         <div className="col-span-1 lg:col-span-1 space-y-2">
           {/* 1. Address Card */}
-          <div
+          {(isMinecraft || server.primaryPort) && <button
+            type="button"
             onClick={handleCopyAddress}
-            className="p-3.5 rounded-xl bg-[#14151b] border border-[#23252e] hover:border-[#323542] transition-colors cursor-pointer group relative overflow-hidden"
-            title="Click to copy Address"
+            className="w-full text-left p-3.5 rounded-xl bg-[var(--color-surface-2)] border border-[var(--color-line)] hover:border-[var(--color-accent)] transition-colors cursor-pointer group relative overflow-hidden"
+            title={isMinecraft ? 'Copy Minecraft join address' : 'Copy exposed application address'}
+            aria-label={`Copy ${isMinecraft ? 'Minecraft join' : 'exposed application'} address ${serverAddress}`}
           >
             <div className="flex items-center gap-2.5">
-              <div className="p-1.5 rounded-lg bg-[#0c0d12] border border-[#23252e] text-[#f97316] group-hover:border-[#f97316]/40 transition-colors">
+              <div className="p-1.5 rounded-lg bg-[var(--color-surface-0)] border border-[var(--color-line)] text-[var(--color-accent)] group-hover:border-[var(--color-accent)]/40 transition-colors">
                 <Wifi className="h-3.5 w-3.5" />
               </div>
               <div className="min-w-0 flex-1">
-                <div className="text-[10px] font-mono uppercase tracking-wider text-neutral-400 font-semibold">Address</div>
+                <div className="text-[10px] font-mono uppercase tracking-wider text-neutral-400 font-semibold">{isMinecraft ? 'Join Address' : 'Exposed Address'}</div>
                 <div className="text-xs font-semibold text-white font-mono truncate flex items-center gap-1 mt-0.5">
                   <span className="truncate">{serverAddress}</span>
                   {addressCopied ? (
@@ -962,12 +993,12 @@ export function ServerConsoleTab({ server, onRefreshServer, onPowerAction, hideH
                 Copied!
               </span>
             )}
-          </div>
+          </button>}
 
           {/* 2. Uptime Card */}
-          <div className="p-3.5 rounded-xl bg-[#14151b] border border-[#23252e]">
+          <div className="p-3.5 rounded-xl bg-[var(--color-surface-2)] border border-[var(--color-line)]">
             <div className="flex items-center gap-2.5">
-              <div className="p-1.5 rounded-lg bg-[#0c0d12] border border-[#23252e] text-[#f97316]">
+              <div className="p-1.5 rounded-lg bg-[var(--color-surface-0)] border border-[var(--color-line)] text-[var(--color-accent)]">
                 <Clock className="h-3.5 w-3.5" />
               </div>
               <div className="min-w-0 flex-1">
@@ -980,35 +1011,36 @@ export function ServerConsoleTab({ server, onRefreshServer, onPowerAction, hideH
           </div>
 
           {/* 3. CPU Load Card */}
-          <div className="p-3.5 rounded-xl bg-[#14151b] border border-[#23252e] space-y-2">
+          <div className="p-3.5 rounded-xl bg-[var(--color-surface-2)] border border-[var(--color-line)] space-y-2">
             <div className="flex items-center gap-2.5">
-              <div className="p-1.5 rounded-lg bg-[#0c0d12] border border-[#23252e] text-[#f97316]">
+              <div className="p-1.5 rounded-lg bg-[var(--color-surface-0)] border border-[var(--color-line)] text-[var(--color-accent)]">
                 <Cpu className="h-3.5 w-3.5" />
               </div>
               <div className="min-w-0 flex-1">
                 <div className="text-[10px] font-mono uppercase tracking-wider text-neutral-400 font-semibold">CPU Load</div>
                 <div className="text-xs font-semibold text-white font-mono truncate mt-0.5">
                   {isRunning ? `${realCpuPercent.toFixed(2)}%` : '0.00%'}
-                  <span className="text-[10px] text-neutral-400 font-normal ml-1">/ {maxCpuPercent}%</span>
+                  <span className="text-[10px] text-neutral-400 font-normal ml-1">/ 100% total CPU</span>
                 </div>
               </div>
             </div>
-            <div className="h-1.5 w-full bg-[#1e2029] rounded-full overflow-hidden">
+            <div className="h-1.5 w-full bg-[var(--color-surface-3)] rounded-full overflow-hidden">
               <div
                 className={`h-full rounded-full transition-all duration-300 ${
                   (realCpuPercent / (maxCpuPercent || 100)) * 100 > 95
                     ? 'bg-gradient-to-r from-rose-500 to-red-600'
-                    : 'bg-gradient-to-r from-amber-500 to-[#f97316]'
+                    : 'bg-gradient-to-r from-amber-500 to-[var(--color-accent)]'
                 }`}
                 style={{ width: `${Math.min(100, (realCpuPercent / (maxCpuPercent || 100)) * 100)}%` }}
               />
             </div>
+            <span className="text-[10px] font-mono text-[var(--color-ink-mute)]">CPU quota not enforced</span>
           </div>
 
           {/* 4. Memory Card */}
-          <div className="p-3.5 rounded-xl bg-[#14151b] border border-[#23252e] space-y-2">
+          <div className="p-3.5 rounded-xl bg-[var(--color-surface-2)] border border-[var(--color-line)] space-y-2">
             <div className="flex items-center gap-2.5">
-              <div className="p-1.5 rounded-lg bg-[#0c0d12] border border-[#23252e] text-[#f97316]">
+              <div className="p-1.5 rounded-lg bg-[var(--color-surface-0)] border border-[var(--color-line)] text-[var(--color-accent)]">
                 <Layers className="h-3.5 w-3.5" />
               </div>
               <div className="min-w-0 flex-1">
@@ -1019,7 +1051,7 @@ export function ServerConsoleTab({ server, onRefreshServer, onPowerAction, hideH
                 </div>
               </div>
             </div>
-            <div className="h-1.5 w-full bg-[#1e2029] rounded-full overflow-hidden">
+            <div className="h-1.5 w-full bg-[var(--color-surface-3)] rounded-full overflow-hidden">
               <div
                 className={`h-full rounded-full transition-all duration-300 ${
                   ramPercent > 95
@@ -1029,12 +1061,15 @@ export function ServerConsoleTab({ server, onRefreshServer, onPowerAction, hideH
                 style={{ width: `${isRunning ? ramPercent : 0}%` }}
               />
             </div>
+            <span className="text-[10px] font-mono text-[var(--color-ink-mute)]">
+              {isMinecraft ? 'JVM heap cap; native memory may exceed it' : 'Runtime memory cap is platform-dependent'}
+            </span>
           </div>
 
           {/* 5. Disk Card */}
-          <div className="p-3.5 rounded-xl bg-[#14151b] border border-[#23252e] space-y-2">
+          <div className="p-3.5 rounded-xl bg-[var(--color-surface-2)] border border-[var(--color-line)] space-y-2">
             <div className="flex items-center gap-2.5">
-              <div className="p-1.5 rounded-lg bg-[#0c0d12] border border-[#23252e] text-[#f97316]">
+              <div className="p-1.5 rounded-lg bg-[var(--color-surface-0)] border border-[var(--color-line)] text-[var(--color-accent)]">
                 <HardDrive className="h-3.5 w-3.5" />
               </div>
               <div className="min-w-0 flex-1">
@@ -1045,22 +1080,23 @@ export function ServerConsoleTab({ server, onRefreshServer, onPowerAction, hideH
                 </div>
               </div>
             </div>
-            <div className="h-1.5 w-full bg-[#1e2029] rounded-full overflow-hidden">
+            <div className="h-1.5 w-full bg-[var(--color-surface-3)] rounded-full overflow-hidden">
               <div
                 className={`h-full rounded-full transition-all duration-300 ${
                   diskPercent > 95
                     ? 'bg-gradient-to-r from-rose-500 to-red-600'
-                    : 'bg-gradient-to-r from-amber-500 to-[#f97316]'
+                    : 'bg-gradient-to-r from-amber-500 to-[var(--color-accent)]'
                 }`}
                 style={{ width: `${diskPercent}%` }}
               />
             </div>
+            <span className="text-[10px] font-mono text-[var(--color-ink-mute)]">Disk quota not enforced</span>
           </div>
 
           {/* 6. Network (Inbound) Card */}
-          <div className="p-3.5 rounded-xl bg-[#14151b] border border-[#23252e]">
+          <div className="p-3.5 rounded-xl bg-[var(--color-surface-2)] border border-[var(--color-line)]">
             <div className="flex items-center gap-2.5">
-              <div className="p-1.5 rounded-lg bg-[#0c0d12] border border-[#23252e] text-[#f97316]">
+              <div className="p-1.5 rounded-lg bg-[var(--color-surface-0)] border border-[var(--color-line)] text-[var(--color-accent)]">
                 <ArrowDown className="h-3.5 w-3.5" />
               </div>
               <div className="min-w-0 flex-1">
@@ -1073,9 +1109,9 @@ export function ServerConsoleTab({ server, onRefreshServer, onPowerAction, hideH
           </div>
 
           {/* 7. Network (Outbound) Card */}
-          <div className="p-3.5 rounded-xl bg-[#14151b] border border-[#23252e]">
+          <div className="p-3.5 rounded-xl bg-[var(--color-surface-2)] border border-[var(--color-line)]">
             <div className="flex items-center gap-2.5">
-              <div className="p-1.5 rounded-lg bg-[#0c0d12] border border-[#23252e] text-[#f97316]">
+              <div className="p-1.5 rounded-lg bg-[var(--color-surface-0)] border border-[var(--color-line)] text-[var(--color-accent)]">
                 <ArrowUp className="h-3.5 w-3.5" />
               </div>
               <div className="min-w-0 flex-1">

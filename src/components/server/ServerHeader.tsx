@@ -118,7 +118,7 @@ export const ServerHeader: React.FC<ServerHeaderProps> = ({
   const isMoreTabActive = !!activeMoreTab;
 
   return (
-    <div className="border-b border-[#181920] bg-[#09090b] shrink-0">
+    <div className="border-b border-[var(--color-surface-2)] bg-[var(--color-bg)] shrink-0">
       <div className="max-w-[1440px] mx-auto w-full px-4 sm:px-6 lg:px-8 pt-4 pb-2 space-y-4">
       {/* 1. Breadcrumb row (Orihost image_00688f85.png) */}
       <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-neutral-400">
@@ -128,21 +128,21 @@ export const ServerHeader: React.FC<ServerHeaderProps> = ({
             onClick={() => onNavigate('servers')}
             className="inline-flex items-center gap-1.5 text-neutral-400 hover:text-white transition-colors cursor-pointer"
           >
-            <ArrowLeft className="h-3.5 w-3.5 text-[#f97316]" />
+            <ArrowLeft className="h-3.5 w-3.5 text-[var(--color-accent)]" />
             <span>Servers</span>
           </button>
           <span>/</span>
           <span className="text-white font-semibold truncate max-w-[200px] sm:max-w-xs">{server.name}</span>
           <span>/</span>
-          <span className="text-[#f97316] font-semibold capitalize">{activeTab}</span>
+          <span className="text-[var(--color-accent)] font-semibold capitalize">{activeTab}</span>
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="font-mono text-[10px] text-neutral-400 bg-[#14151b] px-2.5 py-0.5 rounded border border-[#23252e]">
+          <span className="font-mono text-[10px] text-neutral-400 bg-[var(--color-surface-2)] px-2.5 py-0.5 rounded border border-[var(--color-line)]">
             Node: {server.location || 'DE-04'}
           </span>
           {server.isSubuser && (
-            <span className="font-mono text-[10px] text-[#f97316] bg-[#f97316]/10 px-2.5 py-0.5 rounded border border-[#f97316]/30">
+            <span className="font-mono text-[10px] text-[var(--color-accent)] bg-[var(--color-accent)]/10 px-2.5 py-0.5 rounded border border-[var(--color-accent)]/30">
               Shared Access
             </span>
           )}
@@ -153,7 +153,7 @@ export const ServerHeader: React.FC<ServerHeaderProps> = ({
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         {/* Left: Icon, Server Name & Real Specs */}
         <div className="flex items-start sm:items-center gap-3">
-          <div className="h-11 w-11 rounded-xl flex items-center justify-center shrink-0 border border-[#23252e] bg-[#14151b] text-[#f97316] shadow-sm">
+          <div className="h-11 w-11 rounded-xl flex items-center justify-center shrink-0 border border-[var(--color-line)] bg-[var(--color-surface-2)] text-[var(--color-accent)] shadow-sm">
             {isMinecraft ? <Box className="h-5 w-5" /> : isPython ? <FileText className="h-5 w-5" /> : <TerminalIcon className="h-5 w-5" />}
           </div>
 
@@ -165,35 +165,37 @@ export const ServerHeader: React.FC<ServerHeaderProps> = ({
 
               {/* Status Badge */}
               <span
-                className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded text-[10px] font-semibold border ${
-                  server.status === 'running'
-                    ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
-                    : server.status === 'starting' || server.status === 'stopping'
-                    ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
-                    : 'bg-neutral-800 text-neutral-400 border-neutral-700'
-                }`}
+                className="server-status inline-flex items-center gap-1.5"
+                data-state={server.status}
+                aria-label={`Server status: ${server.status}`}
               >
-                <span
-                  className={`h-1.5 w-1.5 rounded-full ${
-                    server.status === 'running'
-                      ? 'bg-emerald-400 animate-pulse'
-                      : server.status === 'starting' || server.status === 'stopping'
-                      ? 'bg-amber-400 animate-spin'
-                      : 'bg-neutral-500'
-                  }`}
-                />
-                <span className="uppercase tracking-wider font-mono">{server.status}</span>
+                <span className={`h-1.5 w-1.5 rounded-full ${server.status === 'running' ? 'bg-[var(--color-ok)]' : server.status === 'starting' || server.status === 'stopping' ? 'bg-[var(--color-warn)]' : server.status === 'crashed' ? 'bg-[var(--color-err)]' : 'bg-[var(--color-ink-mute)]'}`} />
+                <span className="tracking-wider font-mono">{server.status}</span>
               </span>
 
-              {/* Address with 1-click Copy */}
-              <div
-                onClick={() => onCopy(fullIp)}
-                className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded bg-[#14151b] border border-[#23252e] text-xs font-mono text-neutral-300 hover:text-white hover:border-[#f97316] transition-colors cursor-pointer group"
-                title="Click to copy address"
-              >
-                <span>{fullIp}</span>
-                {copied ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3 text-neutral-400 group-hover:text-white" />}
-              </div>
+              {isMinecraft ? (
+                <button
+                  type="button"
+                  onClick={() => onCopy(fullIp)}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-[var(--color-surface-2)] border border-[var(--color-line)] text-xs font-mono text-[var(--color-ink)] hover:border-[var(--color-accent)] transition-colors cursor-pointer"
+                  title="Copy Minecraft join address"
+                  aria-label={`Copy Minecraft join address ${fullIp}`}
+                >
+                  <span>{fullIp}</span>
+                  {copied ? <Check className="h-3 w-3 text-[var(--color-ok)]" /> : <Copy className="h-3 w-3 text-[var(--color-ink-dim)]" />}
+                </button>
+              ) : server.primaryPort ? (
+                <button
+                  type="button"
+                  onClick={() => onCopy(fullIp)}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-[var(--color-surface-2)] border border-[var(--color-line)] text-xs font-mono text-[var(--color-ink)] hover:border-[var(--color-accent)] transition-colors cursor-pointer"
+                  title="Copy exposed application address"
+                  aria-label={`Copy exposed application address ${fullIp}`}
+                >
+                  <span>Exposed: {fullIp}</span>
+                  {copied ? <Check className="h-3 w-3 text-[var(--color-ok)]" /> : <Copy className="h-3 w-3 text-[var(--color-ink-dim)]" />}
+                </button>
+              ) : null}
 
               {/* Location Tag */}
               <span className="text-[10px] font-mono text-neutral-400 flex items-center gap-1">
@@ -224,7 +226,7 @@ export const ServerHeader: React.FC<ServerHeaderProps> = ({
               type="button"
               disabled={powerLoadingAction !== null || !canStart}
               onClick={() => onPowerAction('start')}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#f97316] hover:bg-[#ea580c] text-white text-xs font-bold transition-all shadow-sm cursor-pointer disabled:opacity-50"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white text-xs font-bold transition-all shadow-sm cursor-pointer disabled:opacity-50"
             >
               {powerLoadingAction === 'start' ? (
                 <RotateCw className="h-3.5 w-3.5 animate-spin" />
@@ -239,7 +241,7 @@ export const ServerHeader: React.FC<ServerHeaderProps> = ({
                 type="button"
                 disabled={powerLoadingAction !== null || !canRestart}
                 onClick={() => onPowerAction('restart')}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-[#14151b] border border-[#23252e] hover:border-amber-500/50 text-amber-400 text-xs font-bold transition-all cursor-pointer disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-[var(--color-surface-2)] border border-[var(--color-line)] hover:border-amber-500/50 text-amber-400 text-xs font-bold transition-all cursor-pointer disabled:opacity-50"
               >
                 {powerLoadingAction === 'restart' ? (
                   <RotateCw className="h-3.5 w-3.5 animate-spin" />
@@ -253,7 +255,7 @@ export const ServerHeader: React.FC<ServerHeaderProps> = ({
                 type="button"
                 disabled={powerLoadingAction !== null || !canStop}
                 onClick={() => onPowerAction('stop')}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-[#14151b] border border-[#23252e] hover:border-red-500/50 text-red-400 text-xs font-bold transition-all cursor-pointer disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-[var(--color-surface-2)] border border-[var(--color-line)] hover:border-red-500/50 text-red-400 text-xs font-bold transition-all cursor-pointer disabled:opacity-50"
               >
                 {powerLoadingAction === 'stop' ? (
                   <RotateCw className="h-3.5 w-3.5 animate-spin" />
@@ -268,8 +270,9 @@ export const ServerHeader: React.FC<ServerHeaderProps> = ({
                   type="button"
                   disabled={powerLoadingAction !== null}
                   onClick={() => onPowerAction('kill')}
-                  className="p-2 rounded-lg bg-[#14151b] border border-[#23252e] hover:bg-red-950/40 text-neutral-400 hover:text-red-400 transition-colors cursor-pointer"
+                  className="p-2 rounded-lg bg-[var(--color-surface-2)] border border-[var(--color-line)] hover:bg-red-950/40 text-neutral-400 hover:text-red-400 transition-colors cursor-pointer"
                   title="Force Kill (SIGKILL)"
+                  aria-label="Force kill server"
                 >
                   <Skull className="h-3.5 w-3.5" />
                 </button>
@@ -280,7 +283,7 @@ export const ServerHeader: React.FC<ServerHeaderProps> = ({
       </div>
 
       {/* 3. Horizontal Sub-Navigation Tabs Row */}
-      <div className="flex items-center justify-between border-t border-[#23252e]/80 pt-2 relative overflow-visible gap-2">
+      <div className="flex items-center justify-between border-t border-[var(--color-line)]/80 pt-2 relative overflow-visible gap-2">
         {/* Scrollable Main Tabs Row */}
         <div className="flex-1 overflow-x-auto no-scrollbar flex items-center gap-1 sm:gap-2 py-0.5">
           {mainTabs.map((tab) => {
@@ -292,14 +295,14 @@ export const ServerHeader: React.FC<ServerHeaderProps> = ({
                 onClick={() => onTabSelect && onTabSelect(tab.id)}
                 className={`relative flex items-center gap-2 px-3 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer whitespace-nowrap shrink-0 ${
                   isActive
-                    ? 'text-white bg-[#181922] border-b-2 border-[#f97316]'
-                    : 'text-neutral-400 hover:text-white hover:bg-[#14151b]'
+                    ? 'text-white bg-[var(--color-surface-2)] border-b-2 border-[var(--color-accent)]'
+                    : 'text-neutral-400 hover:text-white hover:bg-[var(--color-surface-2)]'
                 }`}
               >
-                <Icon className={`h-3.5 w-3.5 ${isActive ? 'text-[#f97316]' : 'text-neutral-400'}`} />
+                <Icon className={`h-3.5 w-3.5 ${isActive ? 'text-[var(--color-accent)]' : 'text-neutral-400'}`} />
                 <span>{tab.label}</span>
                 {tab.count !== undefined && tab.count > 0 && (
-                  <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-[#23252e] text-neutral-300">
+                  <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-[var(--color-line)] text-neutral-300">
                     {tab.count}
                   </span>
                 )}
@@ -315,24 +318,24 @@ export const ServerHeader: React.FC<ServerHeaderProps> = ({
             onClick={() => setMoreDropdownOpen((prev) => !prev)}
             className={`flex items-center gap-2 px-3 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer whitespace-nowrap border shadow-sm ${
               isMoreTabActive
-                ? 'text-white bg-[#181924] border-[#f97316]/50 shadow-orange-500/10'
-                : 'text-neutral-400 hover:text-white hover:bg-[#14151b] border-transparent hover:border-[#23252e]'
+                ? 'text-white bg-[var(--color-surface-2)] border-[var(--color-accent)]/50 shadow-orange-500/10'
+                : 'text-neutral-400 hover:text-white hover:bg-[var(--color-surface-2)] border-transparent hover:border-[var(--color-line)]'
             }`}
           >
             <div className="flex items-center gap-1.5">
               <span>{isMoreTabActive && activeMoreTab ? activeMoreTab.label : 'More'}</span>
               {isMoreTabActive && (
-                <span className="h-1.5 w-1.5 rounded-full bg-[#f97316] animate-pulse" />
+                <span className="h-1.5 w-1.5 rounded-full bg-[var(--color-accent)] animate-pulse" />
               )}
             </div>
-            <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-200 ${moreDropdownOpen ? 'rotate-180 text-[#f97316]' : 'text-neutral-400'}`} />
+            <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-200 ${moreDropdownOpen ? 'rotate-180 text-[var(--color-accent)]' : 'text-neutral-400'}`} />
           </button>
 
           {moreDropdownOpen && (
-            <div className="absolute right-0 top-full mt-2 w-64 rounded-2xl bg-[#14151b] border border-[#262834] shadow-[0_20px_50px_rgba(0,0,0,0.85)] p-2 z-[999] animate-in fade-in zoom-in-95 duration-150">
-              <div className="flex items-center justify-between px-3 py-1.5 text-[10px] font-mono uppercase tracking-wider text-neutral-400 font-semibold border-b border-[#23252e]/80 mb-1">
+            <div className="absolute right-0 top-full mt-2 w-64 rounded-2xl bg-[var(--color-surface-2)] border border-[var(--color-line)] shadow-[0_20px_50px_rgba(0,0,0,0.85)] p-2 z-[999] animate-in fade-in zoom-in-95 duration-150">
+              <div className="flex items-center justify-between px-3 py-1.5 text-[10px] font-mono uppercase tracking-wider text-neutral-400 font-semibold border-b border-[var(--color-line)]/80 mb-1">
                 <span>Tools & Advanced</span>
-                <span className="w-1.5 h-1.5 rounded-full bg-[#f97316]" />
+                <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-accent)]" />
               </div>
 
               <div className="space-y-1">
@@ -349,15 +352,15 @@ export const ServerHeader: React.FC<ServerHeaderProps> = ({
                       }}
                       className={`w-full text-left px-3 py-2.5 rounded-xl text-xs font-medium transition-all cursor-pointer flex items-center justify-between group ${
                         isActive
-                          ? 'bg-[#181924] text-[#f97316] font-bold border border-[#f97316]/30 shadow-inner'
-                          : 'text-neutral-300 hover:text-white hover:bg-[#1c1e28]'
+                          ? 'bg-[var(--color-surface-2)] text-[var(--color-accent)] font-bold border border-[var(--color-accent)]/30 shadow-inner'
+                          : 'text-neutral-300 hover:text-white hover:bg-[var(--color-surface-3)]'
                       }`}
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
                         <div className={`p-1.5 rounded-lg border transition-colors shrink-0 ${
                           isActive
-                            ? 'bg-[#09090b] border-[#f97316]/40 text-[#f97316]'
-                            : 'bg-[#09090b] border-[#1f212b] text-neutral-400 group-hover:text-white group-hover:border-neutral-700'
+                            ? 'bg-[var(--color-bg)] border-[var(--color-accent)]/40 text-[var(--color-accent)]'
+                            : 'bg-[var(--color-bg)] border-[var(--color-line)] text-neutral-400 group-hover:text-white group-hover:border-neutral-700'
                         }`}>
                           <Icon className="h-3.5 w-3.5" />
                         </div>
@@ -370,7 +373,7 @@ export const ServerHeader: React.FC<ServerHeaderProps> = ({
                       </div>
 
                       {isActive && (
-                        <span className="h-2 w-2 rounded-full bg-[#f97316] shadow-sm shadow-orange-500/50 shrink-0 ml-2" />
+                        <span className="h-2 w-2 rounded-full bg-[var(--color-accent)] shadow-sm shadow-orange-500/50 shrink-0 ml-2" />
                       )}
                     </button>
                   );

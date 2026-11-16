@@ -9,9 +9,10 @@ import {
 
 interface ServerPropertiesProps {
   server: Server;
+  onDirtyChange?: (dirty: boolean) => void;
 }
 
-export const ServerProperties: React.FC<ServerPropertiesProps> = ({ server }) => {
+export const ServerProperties: React.FC<ServerPropertiesProps> = ({ server, onDirtyChange }) => {
   const { toast } = useToast();
   const [fields, setFields] = useState<ServerPropertyField[]>([]);
   const [changes, setChanges] = useState<Record<string, string | boolean | number>>({});
@@ -23,6 +24,7 @@ export const ServerProperties: React.FC<ServerPropertiesProps> = ({ server }) =>
   // Raw Editor State
   const [isRawMode, setIsRawMode] = useState(false);
   const [rawContent, setRawContent] = useState('');
+  const rawSavedContent = React.useRef('');
   const [loadingRaw, setLoadingRaw] = useState(false);
   const [savingRaw, setSavingRaw] = useState(false);
   const [velocityProxyEnabled, setVelocityProxyEnabled] = useState(
@@ -58,7 +60,9 @@ export const ServerProperties: React.FC<ServerPropertiesProps> = ({ server }) =>
         `/servers/${server.id}/properties/raw`
       );
       if (res.success) {
-        setRawContent(res.data?.content || '');
+        const content = res.data?.content || '';
+        setRawContent(content);
+        rawSavedContent.current = content;
       }
     } catch (err: any) {
       toast.error(err.message || 'Failed to fetch raw properties');
@@ -74,6 +78,29 @@ export const ServerProperties: React.FC<ServerPropertiesProps> = ({ server }) =>
       fetchProperties();
     }
   }, [isRawMode, fetchProperties, fetchRawContent]);
+
+  const hasUnsavedChanges = isRawMode
+    ? rawContent !== rawSavedContent.current
+    : Object.keys(changes).length > 0 || velocityProxyEnabled !== savedVelocityProxyEnabled;
+  const handleEditorModeChange = () => {
+    if (hasUnsavedChanges && !window.confirm('You have unsaved server properties. Switch editor modes and discard these changes?')) return;
+    onDirtyChange?.(false);
+    setIsRawMode(mode => !mode);
+  };
+
+  useEffect(() => {
+    onDirtyChange?.(hasUnsavedChanges);
+  }, [hasUnsavedChanges, onDirtyChange]);
+
+  useEffect(() => {
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (!hasUnsavedChanges) return;
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges]);
 
   // Handle field change
   const handleChange = (key: string, value: string | boolean | number) => {
@@ -107,9 +134,11 @@ export const ServerProperties: React.FC<ServerPropertiesProps> = ({ server }) =>
           toast.info('Restart server for changes to take effect.');
         }
         await fetchProperties();
+      } else {
+        toast.retry('error', res.message || 'Failed to save properties', handleSave, 'Save failed');
       }
     } catch (err: any) {
-      toast.error(err.message || 'Failed to save properties');
+      toast.retry('error', err.message || 'Failed to save properties', handleSave, 'Save failed');
     } finally {
       setSaving(false);
     }
@@ -132,9 +161,11 @@ export const ServerProperties: React.FC<ServerPropertiesProps> = ({ server }) =>
       if (res.success) {
         toast.success(res.message);
         await fetchProperties();
+      } else {
+        toast.retry('error', res.message || 'Reset failed', handleResetDefaults, 'Reset failed');
       }
     } catch (err: any) {
-      toast.error(err.message || 'Reset failed');
+      toast.retry('error', err.message || 'Reset failed', handleResetDefaults, 'Reset failed');
     } finally {
       setSaving(false);
     }
@@ -153,10 +184,13 @@ export const ServerProperties: React.FC<ServerPropertiesProps> = ({ server }) =>
       );
       if (res.success) {
         toast.success(res.message);
+        rawSavedContent.current = rawContent;
         if (res.restartRequired) toast.info('Restart server to apply configuration changes.');
+      } else {
+        toast.retry('error', res.message || 'Failed to save raw server.properties', handleSaveRaw, 'Save failed');
       }
     } catch (err: any) {
-      toast.error(err.message || 'Failed to save raw server.properties');
+      toast.retry('error', err.message || 'Failed to save raw server.properties', handleSaveRaw, 'Save failed');
     } finally {
       setSavingRaw(false);
     }
@@ -174,9 +208,16 @@ export const ServerProperties: React.FC<ServerPropertiesProps> = ({ server }) =>
       (f.description && f.description.toLowerCase().includes(searchQuery.toLowerCase()));
     return matchCat && matchSearch;
   });
+  const validationErrors = new Map<string, string>();
+  fields.forEach(field => {
+    if (field.type !== 'number' || changes[field.key] === undefined) return;
+    const value = Number(changes[field.key]);
+    if (!Number.isFinite(value)) validationErrors.set(field.key, 'Enter a valid number.');
+    else if (field.min !== undefined && value < field.min) validationErrors.set(field.key, `Must be at least ${field.min}.`);
+    else if (field.max !== undefined && value > field.max) validationErrors.set(field.key, `Must be no more than ${field.max}.`);
+  });
+  const hasValidationErrors = validationErrors.size > 0;
 
-  const hasUnsavedChanges = Object.keys(changes).length > 0 ||
-    velocityProxyEnabled !== savedVelocityProxyEnabled;
   const supportsVelocityProxy = /paper|purpur/i.test(server.software || '');
 
   return (
@@ -211,7 +252,7 @@ export const ServerProperties: React.FC<ServerPropertiesProps> = ({ server }) =>
 
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setIsRawMode(!isRawMode)}
+            onClick={handleEditorModeChange}
             className={`btn px-3 py-1.5 text-xs border border-[var(--color-line)] flex items-center gap-1.5 ${
               isRawMode ? 'bg-[var(--color-accent)] text-black font-semibold' : ''
             }`}
@@ -233,7 +274,7 @@ export const ServerProperties: React.FC<ServerPropertiesProps> = ({ server }) =>
 
               <button
                 onClick={handleSave}
-                disabled={!hasUnsavedChanges || saving}
+                disabled={!hasUnsavedChanges || saving || hasValidationErrors}
                 className={`px-4 py-1.5 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors ${
                   hasUnsavedChanges
                     ? 'btn-primary'
@@ -399,14 +440,22 @@ export const ServerProperties: React.FC<ServerPropertiesProps> = ({ server }) =>
                           ))}
                         </select>
                       ) : field.type === 'number' ? (
-                        <input
-                          type="number"
-                          min={field.min}
-                          max={field.max}
-                          value={Number(effectiveVal) || 0}
-                          onChange={e => handleChange(field.key, Number(e.target.value))}
-                          className="field w-full px-3 py-1.5 text-xs bg-[var(--color-surface-2)] border border-[var(--color-line)] rounded-lg font-mono text-[var(--color-ink)]"
-                        />
+                        <div className="w-full">
+                          <input
+                            type="number"
+                            min={field.min}
+                            max={field.max}
+                            value={Number(effectiveVal) || 0}
+                            onChange={e => handleChange(field.key, Number(e.target.value))}
+                            aria-invalid={validationErrors.has(field.key)}
+                            className="field w-full px-3 py-1.5 text-xs bg-[var(--color-surface-2)] border border-[var(--color-line)] rounded-lg font-mono text-[var(--color-ink)]"
+                          />
+                          {validationErrors.has(field.key) && (
+                            <span className="mt-1 block text-[10px] text-[var(--color-err)]" role="alert">
+                              {validationErrors.get(field.key)}
+                            </span>
+                          )}
+                        </div>
                       ) : field.type === 'textarea' ? (
                         <textarea
                           rows={2}

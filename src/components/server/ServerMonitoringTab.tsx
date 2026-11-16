@@ -207,7 +207,7 @@ export const ServerMonitoringTab: React.FC<ServerMonitoringTabProps> = ({ server
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="text-xs font-semibold text-[var(--color-ink)] tracking-tight">Real-Time Hardware Telemetry</h3>
-                <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[10px] font-mono font-medium text-[var(--color-ok)] border border-[var(--color-ok)]/40 bg-[var(--color-ok)]/10">
+                <span className="badge badge-success">
                   <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-ok)] animate-pulse" />
                   Live 2.5s Feed
                 </span>
@@ -246,10 +246,10 @@ export const ServerMonitoringTab: React.FC<ServerMonitoringTabProps> = ({ server
       {/* Primary Hardware Consumption Cards (Dual GB/MB + CPU % + Storage) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         {/* Memory RAM Card */}
-        <div className="p-3.5 rounded-lg bg-[var(--color-surface)] border border-[var(--color-line)] space-y-1.5">
+        <div className="hardware-card space-y-1.5">
           <div className="flex items-center justify-between">
             <span className="label flex items-center gap-1.5">
-              <Cpu className="h-3.5 w-3.5 text-[var(--color-accent)]" />
+              <Cpu className="hardware-icon-tile" />
               Memory (RAM)
             </span>
             <span className={`text-xs font-mono font-semibold ${isRunning ? 'text-[var(--color-ink)]' : 'text-[var(--color-ink-mute)]'}`}>
@@ -282,10 +282,10 @@ export const ServerMonitoringTab: React.FC<ServerMonitoringTabProps> = ({ server
         </div>
 
         {/* CPU Load Utilization Card */}
-        <div className="p-3.5 rounded-lg bg-[var(--color-surface)] border border-[var(--color-line)] space-y-1.5">
+        <div className="hardware-card space-y-1.5">
           <div className="flex items-center justify-between">
             <span className="label flex items-center gap-1.5">
-              <Zap className="h-3.5 w-3.5 text-[var(--color-accent)]" />
+              <Zap className="hardware-icon-tile" />
               CPU Core Load
             </span>
             <span className={`text-xs font-mono font-semibold ${isRunning ? 'text-[var(--color-ink)]' : 'text-[var(--color-ink-mute)]'}`}>
@@ -318,10 +318,10 @@ export const ServerMonitoringTab: React.FC<ServerMonitoringTabProps> = ({ server
         </div>
 
         {/* NVMe Storage Card */}
-        <div className="p-3.5 rounded-lg bg-[var(--color-surface)] border border-[var(--color-line)] space-y-1.5">
+        <div className="hardware-card space-y-1.5">
           <div className="flex items-center justify-between">
             <span className="label flex items-center gap-1.5">
-              <HardDrive className="h-3.5 w-3.5 text-[var(--color-accent)]" />
+              <HardDrive className="hardware-icon-tile" />
               NVMe Storage
             </span>
             <span className="text-xs font-mono font-semibold text-[var(--color-ink)]">
@@ -354,10 +354,10 @@ export const ServerMonitoringTab: React.FC<ServerMonitoringTabProps> = ({ server
         </div>
 
         {/* Lifecycle & Socket Health Card */}
-        <div className="p-3.5 rounded-lg bg-[var(--color-surface)] border border-[var(--color-line)] space-y-1.5">
+        <div className="hardware-card space-y-1.5">
           <div className="flex items-center justify-between">
             <span className="label flex items-center gap-1.5">
-              <Radio className="h-3.5 w-3.5 text-[var(--color-accent)]" />
+              <Radio className="hardware-icon-tile" />
               Process & Socket
             </span>
             <span className={`text-xs font-mono font-semibold capitalize ${isRunning ? 'text-[var(--color-ok)]' : 'text-[var(--color-ink-mute)]'}`}>

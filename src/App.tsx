@@ -408,7 +408,7 @@ function AppContent() {
               </div>
 
               {/* Subtle Panel Footer for Customer & Admin Pages */}
-              <footer className={`py-3 px-5 border border-white/5 bg-zinc-950/20 text-[10px] text-zinc-500 flex items-center justify-between font-mono shrink-0 mt-8 rounded-xl shadow-inner ${
+              <footer className={`py-3 px-5 border border-[var(--border-1)] bg-zinc-950/20 text-[10px] text-zinc-500 flex items-center justify-between font-mono shrink-0 mt-8 rounded-xl shadow-inner ${
                 currentPage === 'server-manage'
                   ? 'max-w-[1440px] w-[calc(100%-2rem)] sm:w-[calc(100%-3rem)] lg:w-[calc(100%-4rem)] mx-auto mb-6'
                   : ''

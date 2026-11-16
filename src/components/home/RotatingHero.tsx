@@ -233,7 +233,7 @@ export const RotatingHero: React.FC<RotatingHeroProps> = ({
         <div className="max-w-xl lg:max-w-2xl space-y-4 sm:space-y-6">
           
           {/* Eyebrow / Category Tag */}
-          <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md bg-[var(--color-surface-2)] border border-[var(--color-line)] text-xs font-mono text-[var(--color-ink-dim)]">
+          <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-[color-mix(in_srgb,var(--color-accent)_12%,transparent)] text-[11px] font-mono uppercase tracking-[0.08em] text-[var(--color-ink-dim)]">
             <span className="h-1.5 w-1.5 rounded-full bg-[#FF6A00] animate-pulse" />
             <span>{activeSlide.eyebrow}</span>
             {activeSlide.badge && (

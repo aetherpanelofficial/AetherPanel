@@ -384,7 +384,7 @@ export const AdminHomepage: React.FC<AdminHomepageProps> = ({ onNavigate }) => {
             <button
               type="button"
               onClick={() => onNavigate('home')}
-              className="px-3.5 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-semibold text-xs flex items-center gap-1.5 transition-colors cursor-pointer border border-white/[0.06]"
+              className="px-3.5 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-semibold text-xs flex items-center gap-1.5 transition-colors cursor-pointer border border-[var(--border-1)]"
               title="Open public homepage to preview"
             >
               <Eye className="h-3.5 w-3.5 text-zinc-400" />
@@ -513,7 +513,7 @@ export const AdminHomepage: React.FC<AdminHomepageProps> = ({ onNavigate }) => {
                   onChange={(e) => setShowHeroBadge(e.target.checked)}
                   className="sr-only peer"
                 />
-                <div className="w-11 h-6 bg-zinc-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
+                <div className="w-11 h-6 bg-zinc-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-[var(--border-3)] after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-[var(--border-1)] after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
               </label>
             </div>
 
@@ -634,7 +634,7 @@ export const AdminHomepage: React.FC<AdminHomepageProps> = ({ onNavigate }) => {
                   </span>
                   <div className="flex items-center gap-2 overflow-x-auto pb-1">
                     {heroBackgroundImagesText.split('\n').filter(s => s.trim()).map((imgUrl, i) => (
-                      <div key={i} className="h-12 w-20 rounded-lg overflow-hidden border border-white/[0.1] bg-black shrink-0 relative group">
+                      <div key={i} className="h-12 w-20 rounded-lg overflow-hidden border border-[var(--border-1)] bg-black shrink-0 relative group">
                         <img
                           src={imgUrl.trim()}
                           alt={`Hero wallpaper ${i + 1}`}

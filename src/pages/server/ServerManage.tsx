@@ -66,6 +66,7 @@ export const ServerManage: React.FC<ServerManageProps> = ({ serverId, initialTab
   const [activeTab, setActiveTab] = useState<string>(
     (initialTab as any) || 'console'
   );
+  const [isPropertiesDirty, setIsPropertiesDirty] = useState(false);
 
   useEffect(() => {
     if (initialTab) {
@@ -74,6 +75,11 @@ export const ServerManage: React.FC<ServerManageProps> = ({ serverId, initialTab
   }, [initialTab]);
 
   const handleTabSelect = (tab: any) => {
+    if (activeTab === 'properties' && isPropertiesDirty) {
+      const confirmLeave = window.confirm('You have unsaved server properties. Leave and discard these changes?');
+      if (!confirmLeave) return;
+      setIsPropertiesDirty(false);
+    }
     if (activeTab === 'env' && isEnvDirty) {
       const confirmLeave = window.confirm("You have unsaved environment variable changes. Are you sure you want to leave and discard these changes?");
       if (!confirmLeave) return;
@@ -859,7 +865,7 @@ export const ServerManage: React.FC<ServerManageProps> = ({ serverId, initialTab
       });
       if (res.success === false) {
         setServer(previous => previous ? { ...previous, status: previousStatus || previous.status } : previous);
-        toast.error(res.error?.message || `Failed to ${action} server.`);
+        toast.retry('error', res.error?.message || `Failed to ${action} server.`, () => handlePowerAction(action), 'Power action failed');
         if (action === 'start') runPreflightCheck();
         return;
       }
@@ -870,7 +876,7 @@ export const ServerManage: React.FC<ServerManageProps> = ({ serverId, initialTab
       }
     } catch (error: any) {
       setServer(previous => previous ? { ...previous, status: previousStatus || previous.status } : previous);
-      toast.error(error?.message || `Failed to ${action} server.`);
+      toast.retry('error', error?.message || `Failed to ${action} server.`, () => handlePowerAction(action), 'Power action failed');
     } finally {
       setPowerLoadingAction(null);
     }
@@ -885,7 +891,7 @@ export const ServerManage: React.FC<ServerManageProps> = ({ serverId, initialTab
       toast.success(response.message || 'Crash counter reset.');
       await fetchServerDetails();
     } catch (error: any) {
-      toast.error(error.message || 'Failed to reset crash state.');
+      toast.retry('error', error.message || 'Failed to reset crash state.', handleCrashReset, 'Crash reset failed');
     }
   };
 
@@ -1268,9 +1274,12 @@ export const ServerManage: React.FC<ServerManageProps> = ({ serverId, initialTab
 
   if (loading) {
     return (
-      <div className="p-12 text-center text-xs text-zinc-400 space-y-3">
-        <RefreshCw className="h-6 w-6 animate-spin mx-auto text-violet-400" />
-        <p>Connecting to server container runtime...</p>
+      <div className="space-y-4 p-4" aria-label="Loading server">
+        <div className="h-24 animate-pulse rounded-xl border border-[var(--color-line)] bg-[var(--color-surface-1)]" />
+        <div className="h-12 animate-pulse rounded-xl border border-[var(--color-line)] bg-[var(--color-surface-1)]" />
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          {[0, 1, 2, 3].map(card => <div key={card} className="h-40 animate-pulse rounded-xl border border-[var(--color-line)] bg-[var(--color-surface-1)]" />)}
+        </div>
       </div>
     );
   }
@@ -1308,7 +1317,7 @@ export const ServerManage: React.FC<ServerManageProps> = ({ serverId, initialTab
   const canKill = !server?.isSubuser || server?.permissions?.includes('server.kill') || hasPerm('power.kill');
 
   return (
-    <div className="flex-1 w-full min-w-0 flex flex-col h-full overflow-y-auto bg-[#09090b]">
+    <div className="flex-1 w-full min-w-0 flex flex-col h-full overflow-y-auto bg-[var(--color-bg)]">
       <div className="flex-1 min-w-0 flex flex-col h-full">
         <ServerHeader
           server={server}
@@ -1448,7 +1457,7 @@ export const ServerManage: React.FC<ServerManageProps> = ({ serverId, initialTab
       {/* TAB: MINECRAFT PROPERTIES */}
       {activeTab === "properties" && (
         <TabTransition>
-          <ServerProperties server={server} />
+          <ServerProperties server={server} onDirtyChange={setIsPropertiesDirty} />
         </TabTransition>
       )}
 
@@ -1902,7 +1911,7 @@ export const ServerManage: React.FC<ServerManageProps> = ({ serverId, initialTab
               <Archive className="h-10 w-10 text-zinc-600 mx-auto" />
               <p className="text-sm font-bold text-zinc-300">No Backups Created Yet</p>
               <p className="text-xs text-zinc-500 max-w-sm mx-auto">
-                Create a manual backup snapshot above or schedule automated recurring backups in the Schedules tab.
+                Create a backup to preserve a snapshot of this server's files.
               </p>
             </div>
           ) : (
@@ -3035,7 +3044,7 @@ export const ServerManage: React.FC<ServerManageProps> = ({ serverId, initialTab
                       onClick={() => setActiveBotRuntime('python')}
                       className={`py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                         activeBotRuntime === 'python'
-                          ? 'bg-[#f97316] text-white shadow-lg'
+                          ? 'bg-[var(--color-accent)] text-white shadow-lg'
                           : 'text-zinc-400 hover:text-white hover:bg-zinc-800/50'
                       }`}
                     >
@@ -3165,7 +3174,7 @@ export const ServerManage: React.FC<ServerManageProps> = ({ serverId, initialTab
                           value={startupFlags}
                           onChange={(e) => setStartupFlags(e.target.value)}
                           placeholder="-u"
-                          className="w-full rounded-xl bg-zinc-900 border border-zinc-800 p-3 text-xs font-mono text-amber-300 focus:border-[#f97316] focus:outline-none"
+                          className="w-full rounded-xl bg-zinc-900 border border-zinc-800 p-3 text-xs font-mono text-amber-300 focus:border-[var(--color-accent)] focus:outline-none"
                         />
                       </div>
                     </div>
@@ -3222,7 +3231,7 @@ export const ServerManage: React.FC<ServerManageProps> = ({ serverId, initialTab
             {/* Lifecycle, Auto-Start & Crash Recovery */}
             <div className="p-4 rounded-xl bg-zinc-950 border border-zinc-800 space-y-4">
               <h4 className="text-xs font-bold text-white flex items-center gap-1.5 border-b border-zinc-800/60 pb-2">
-                <Shield className="h-3.5 w-3.5 text-[#f97316]" /> Automation & Crash Recovery Policies
+                <Shield className="h-3.5 w-3.5 text-[var(--color-accent)]" /> Automation & Crash Recovery Policies
               </h4>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -3403,10 +3412,10 @@ export const ServerManage: React.FC<ServerManageProps> = ({ serverId, initialTab
       {/* TAB 9: AUDIT LOG */}
       {activeTab === 'activity' && (
         <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-[#23252e] bg-[#14151b] p-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-[var(--color-line)] bg-[var(--color-surface-2)] p-4">
             <div>
               <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                <Activity className="h-4 w-4 text-[#f97316]" />
+                <Activity className="h-4 w-4 text-[var(--color-accent)]" />
                 <span>Server Activity &amp; Audit Logs</span>
               </h3>
               <p className="text-xs text-neutral-400 mt-0.5">
@@ -3422,25 +3431,25 @@ export const ServerManage: React.FC<ServerManageProps> = ({ serverId, initialTab
                   value={activitySearch}
                   onChange={(e) => setActivitySearch(e.target.value)}
                   placeholder="Filter logs..."
-                  className="bg-[#09090b] border border-[#23252e] focus:border-[#f97316] rounded-lg pl-8 pr-3 py-1.5 text-xs text-white placeholder-neutral-500 focus:outline-none w-44 sm:w-56"
+                  className="bg-[var(--color-bg)] border border-[var(--color-line)] focus:border-[var(--color-accent)] rounded-lg pl-8 pr-3 py-1.5 text-xs text-white placeholder-neutral-500 focus:outline-none w-44 sm:w-56"
                 />
               </div>
               <button
                 type="button"
                 onClick={fetchActivities}
                 disabled={activitiesLoading}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#09090b] border border-[#23252e] hover:border-[#f97316]/50 text-xs font-medium text-neutral-300 hover:text-white transition-colors cursor-pointer disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--color-bg)] border border-[var(--color-line)] hover:border-[var(--color-accent)]/50 text-xs font-medium text-neutral-300 hover:text-white transition-colors cursor-pointer disabled:opacity-50"
               >
-                <RefreshCw className={`h-3.5 w-3.5 ${activitiesLoading ? 'animate-spin text-[#f97316]' : ''}`} />
+                <RefreshCw className={`h-3.5 w-3.5 ${activitiesLoading ? 'animate-spin text-[var(--color-accent)]' : ''}`} />
                 <span>Refresh</span>
               </button>
             </div>
           </div>
 
-          <div className="rounded-2xl border border-[#23252e] bg-[#14151b] overflow-hidden">
+          <div className="rounded-2xl border border-[var(--color-line)] bg-[var(--color-surface-2)] overflow-hidden">
             {activitiesLoading && activities.length === 0 ? (
               <div className="p-12 text-center text-xs text-neutral-400 space-y-2">
-                <RefreshCw className="h-5 w-5 animate-spin text-[#f97316] mx-auto" />
+                <RefreshCw className="h-5 w-5 animate-spin text-[var(--color-accent)] mx-auto" />
                 <div>Loading server activity logs...</div>
               </div>
             ) : (() => {
@@ -3472,7 +3481,7 @@ export const ServerManage: React.FC<ServerManageProps> = ({ serverId, initialTab
               return (
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs">
-                    <thead className="bg-[#09090b] border-b border-[#23252e] text-neutral-400 font-mono text-[11px] uppercase">
+                    <thead className="bg-[var(--color-bg)] border-b border-[var(--color-line)] text-neutral-400 font-mono text-[11px] uppercase">
                       <tr>
                         <th className="py-3 px-4">Actor</th>
                         <th className="py-3 px-4">Action</th>
@@ -3480,9 +3489,9 @@ export const ServerManage: React.FC<ServerManageProps> = ({ serverId, initialTab
                         <th className="py-3 px-4 text-right">Timestamp</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-[#23252e]/70">
+                    <tbody className="divide-y divide-[var(--color-line)]/70">
                       {filtered.map((a: any) => (
-                        <tr key={a.id} className="hover:bg-[#191b24] transition-colors">
+                        <tr key={a.id} className="hover:bg-[var(--color-surface-2)] transition-colors">
                           <td className="py-3 px-4 whitespace-nowrap">
                             <div className="flex items-center gap-2.5">
                               <UserAvatar
@@ -3496,7 +3505,7 @@ export const ServerManage: React.FC<ServerManageProps> = ({ serverId, initialTab
                             </div>
                           </td>
                           <td className="py-3 px-4 whitespace-nowrap">
-                            <span className="inline-flex items-center px-2 py-0.5 rounded bg-[#09090b] border border-[#23252e] font-mono text-[11px] text-[#f97316]">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded bg-[var(--color-bg)] border border-[var(--color-line)] font-mono text-[11px] text-[var(--color-accent)]">
                               {a.action}
                             </span>
                           </td>

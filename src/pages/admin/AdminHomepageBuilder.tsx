@@ -1012,7 +1012,7 @@ export const AdminHomepageBuilder: React.FC<AdminHomepageBuilderProps> = ({ onNa
             {/* Hero Preview */}
             <div className="text-center relative max-w-2xl mx-auto space-y-4 pt-4">
               {config.showHeroBadge !== false && (
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-zinc-900/90 border border-white/[0.08] text-[11px] text-zinc-300">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-zinc-900/90 border border-[var(--border-1)] text-[11px] text-zinc-300">
                   <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
                   <span>{config.heroBadgeText || 'POWERED BY CLOUD'}</span>
                   <span className="text-zinc-600">·</span>
@@ -1035,7 +1035,7 @@ export const AdminHomepageBuilder: React.FC<AdminHomepageBuilderProps> = ({ onNa
                 <div className="px-4 py-2 rounded-lg bg-amber-400 text-zinc-950 font-bold text-xs">
                   {config.heroPrimaryCtaText || 'Get Started'}
                 </div>
-                <div className="px-4 py-2 rounded-lg bg-zinc-900 border border-white/[0.08] text-zinc-300 text-xs">
+                <div className="px-4 py-2 rounded-lg bg-zinc-900 border border-[var(--border-1)] text-zinc-300 text-xs">
                   {config.heroSecondaryCtaText || 'Explore Hosting'}
                 </div>
               </div>
@@ -1049,7 +1049,7 @@ export const AdminHomepageBuilder: React.FC<AdminHomepageBuilderProps> = ({ onNa
 
             {/* Trust Bar Preview */}
             {config.showTrustBar !== false && (
-              <div className="border-y border-white/[0.08] py-3 text-[11px] text-zinc-300 font-medium flex flex-wrap items-center justify-between gap-3">
+              <div className="border-y border-[var(--border-1)] py-3 text-[11px] text-zinc-300 font-medium flex flex-wrap items-center justify-between gap-3">
                 <span className="flex items-center gap-1.5"><ShieldCheck className="w-3.5 h-3.5 text-amber-400" /> {config.trustBarItem1 || '99.99% Uptime SLA'}</span>
                 <span className="flex items-center gap-1.5"><Zap className="w-3.5 h-3.5 text-amber-400" /> {config.trustBarItem2 || 'PCIe Gen4 NVMe'}</span>
                 <span className="flex items-center gap-1.5"><Shield className="w-3.5 h-3.5 text-amber-400" /> {config.trustBarItem3 || '3.2 Tbps DDoS'}</span>
@@ -1059,7 +1059,7 @@ export const AdminHomepageBuilder: React.FC<AdminHomepageBuilderProps> = ({ onNa
             )}
 
             {/* Active Sections Summary */}
-            <div className="p-4 rounded-xl bg-zinc-950/60 border border-white/[0.06] flex items-center justify-between text-xs text-zinc-400">
+            <div className="p-4 rounded-xl bg-zinc-950/60 border border-[var(--border-1)] flex items-center justify-between text-xs text-zinc-400">
               <span>Section Layout Summary:</span>
               <div className="flex flex-wrap gap-2 text-[10px] font-mono">
                 {config.showMinecraftSection !== false && <span className="px-2 py-0.5 rounded bg-zinc-900 text-amber-400">Minecraft: ON</span>}

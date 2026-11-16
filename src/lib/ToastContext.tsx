@@ -9,17 +9,19 @@ export interface ToastItem {
   message: string;
   title?: string;
   duration?: number;
+  onRetry?: () => void | Promise<void>;
 }
 
 interface ToastContextValue {
   toasts: ToastItem[];
-  showToast: (type: ToastType, message: string, title?: string, duration?: number) => string;
+  showToast: (type: ToastType, message: string, title?: string, duration?: number, onRetry?: () => void | Promise<void>) => string;
   dismissToast: (id: string) => void;
   toast: {
     success: (message: string, title?: string, duration?: number) => string;
     error: (message: string, title?: string, duration?: number) => string;
     warning: (message: string, title?: string, duration?: number) => string;
     info: (message: string, title?: string, duration?: number) => string;
+    retry: (type: ToastType, message: string, onRetry: () => void | Promise<void>, title?: string) => string;
   };
 }
 
@@ -50,9 +52,9 @@ export const ToastProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     setToasts(prev => prev.filter(t => t.id !== id));
   }, []);
 
-  const showToast = useCallback((type: ToastType, message: string, title?: string, duration: number = 4000) => {
+  const showToast = useCallback((type: ToastType, message: string, title?: string, duration: number = 4000, onRetry?: () => void | Promise<void>) => {
     const id = `toast_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-    const newItem: ToastItem = { id, type, message, title, duration };
+    const newItem: ToastItem = { id, type, message, title, duration, onRetry };
 
     setToasts(prev => {
       // Prevent exact duplicate flood within 1 second
@@ -94,7 +96,9 @@ export const ToastProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     success: (msg: string, title?: string, dur?: number) => showToast('success', msg, title, dur),
     error: (msg: string, title?: string, dur?: number) => showToast('error', msg, title, dur),
     warning: (msg: string, title?: string, dur?: number) => showToast('warning', msg, title, dur),
-    info: (msg: string, title?: string, dur?: number) => showToast('info', msg, title, dur)
+    info: (msg: string, title?: string, dur?: number) => showToast('info', msg, title, dur),
+    retry: (type: ToastType, msg: string, onRetry: () => void | Promise<void>, title?: string) =>
+      showToast(type, msg, title, 0, onRetry)
   }), [showToast]);
 
   return (
@@ -112,44 +116,63 @@ export const ToastProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           const isError = t.type === 'error';
           const isWarning = t.type === 'warning';
           const isInfo = t.type === 'info';
+          const handleRetry = async () => {
+            if (!t.onRetry) return;
+            dismissToast(t.id);
+            try {
+              await t.onRetry();
+            } catch (error) {
+              const message = error instanceof Error ? error.message : 'Retry failed.';
+              showToast('error', message, 'Retry failed');
+            }
+          };
 
           return (
             <div
               key={t.id}
               role={isError ? 'alert' : 'status'}
-              className={`pointer-events-auto flex items-start gap-3 p-3.5 sm:p-4 rounded-2xl border shadow-xl backdrop-blur-md transition-all duration-300 transform translate-y-0 animate-in fade-in slide-in-from-bottom-2 ${
+              className={`pointer-events-auto flex items-start gap-3 p-3.5 sm:p-4 rounded-2xl border shadow-[var(--shadow-panel)] backdrop-blur-md transition-all duration-300 transform translate-y-0 animate-in fade-in slide-in-from-bottom-2 bg-[var(--color-surface-1)] text-[var(--color-ink)] ${
                 isSuccess
-                  ? 'bg-zinc-900/95 border-emerald-500/30 text-zinc-100 shadow-emerald-950/20'
+                  ? 'border-[var(--color-ok)]/30'
                   : isError
-                  ? 'bg-zinc-900/95 border-rose-500/30 text-zinc-100 shadow-rose-950/20'
+                  ? 'border-[var(--color-err)]/30'
                   : isWarning
-                  ? 'bg-zinc-900/95 border-amber-500/30 text-zinc-100 shadow-amber-950/20'
-                  : 'bg-zinc-900/95 border-violet-500/30 text-zinc-100 shadow-violet-950/20'
+                  ? 'border-[var(--color-warn)]/30'
+                  : 'border-[var(--color-accent)]/30'
               }`}
             >
               <div className="shrink-0 mt-0.5">
-                {isSuccess && <CheckCircle2 className="h-5 w-5 text-emerald-400" />}
-                {isError && <AlertCircle className="h-5 w-5 text-rose-400" />}
-                {isWarning && <AlertTriangle className="h-5 w-5 text-amber-400" />}
-                {isInfo && <Info className="h-5 w-5 text-violet-400" />}
+                {isSuccess && <CheckCircle2 className="h-5 w-5 text-[var(--color-ok)]" />}
+                {isError && <AlertCircle className="h-5 w-5 text-[var(--color-err)]" />}
+                {isWarning && <AlertTriangle className="h-5 w-5 text-[var(--color-warn)]" />}
+                {isInfo && <Info className="h-5 w-5 text-[var(--color-accent)]" />}
               </div>
 
               <div className="flex-1 min-w-0 pr-1">
                 {t.title && (
                   <h5 className={`text-xs font-bold uppercase tracking-wider mb-0.5 ${
-                    isSuccess ? 'text-emerald-400' : isError ? 'text-rose-400' : isWarning ? 'text-amber-400' : 'text-violet-400'
+                    isSuccess ? 'text-[var(--color-ok)]' : isError ? 'text-[var(--color-err)]' : isWarning ? 'text-[var(--color-warn)]' : 'text-[var(--color-accent)]'
                   }`}>
                     {t.title}
                   </h5>
                 )}
-                <p className="text-xs text-zinc-300 font-sans leading-relaxed break-words">
+                <p className="text-xs text-[var(--color-ink-dim)] font-sans leading-relaxed break-words">
                   {t.message}
                 </p>
               </div>
 
+              {t.onRetry && (
+                <button
+                  type="button"
+                  onClick={() => { void handleRetry(); }}
+                  className="shrink-0 rounded-lg border border-[var(--color-line)] px-2 py-1 text-xs font-semibold text-[var(--color-ink)] hover:bg-[var(--color-surface-3)]"
+                >
+                  Retry
+                </button>
+              )}
               <button
                 onClick={() => dismissToast(t.id)}
-                className="shrink-0 p-1 text-zinc-400 hover:text-white rounded-lg hover:bg-zinc-800/60 transition-colors cursor-pointer"
+                className="shrink-0 p-1 text-[var(--color-ink-dim)] hover:text-[var(--color-ink)] rounded-lg hover:bg-[var(--color-surface-3)] transition-colors cursor-pointer"
                 aria-label="Dismiss notification"
               >
                 <X className="h-4 w-4" />

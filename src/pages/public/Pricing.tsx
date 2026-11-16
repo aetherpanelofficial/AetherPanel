@@ -47,13 +47,15 @@ export const Pricing: React.FC<PricingProps> = ({ onNavigate }) => {
         </p>
 
         {/* Category Switcher */}
-        <div className="pt-3 flex items-center justify-center gap-1.5">
+        <div className="pt-3 flex items-center justify-center">
+          <div className="segmented-control">
           <button
             onClick={() => setActiveCategory('minecraft')}
-            className={`flex items-center gap-1.5 px-4 py-2 rounded-md text-xs font-medium transition-colors cursor-pointer ${
+            aria-pressed={activeCategory === 'minecraft'}
+            className={`flex items-center gap-1.5 px-4 py-2 text-xs font-medium transition-colors cursor-pointer ${
               activeCategory === 'minecraft'
-                ? 'bg-[var(--color-surface-3)] text-[var(--color-ink)] border border-[var(--color-line)]'
-                : 'text-[var(--color-ink-dim)] hover:text-[var(--color-ink)] border border-transparent'
+                ? 'text-[var(--color-ink)]'
+                : 'text-[var(--color-ink-dim)] hover:text-[var(--color-ink)]'
             }`}
           >
             <Gamepad2 className="h-3.5 w-3.5 text-[var(--color-accent)]" />
@@ -61,15 +63,17 @@ export const Pricing: React.FC<PricingProps> = ({ onNavigate }) => {
           </button>
           <button
             onClick={() => setActiveCategory('bot')}
-            className={`flex items-center gap-1.5 px-4 py-2 rounded-md text-xs font-medium transition-colors cursor-pointer ${
+            aria-pressed={activeCategory === 'bot'}
+            className={`flex items-center gap-1.5 px-4 py-2 text-xs font-medium transition-colors cursor-pointer ${
               activeCategory === 'bot'
-                ? 'bg-[var(--color-surface-3)] text-[var(--color-ink)] border border-[var(--color-line)]'
-                : 'text-[var(--color-ink-dim)] hover:text-[var(--color-ink)] border border-transparent'
+                ? 'text-[var(--color-ink)]'
+                : 'text-[var(--color-ink-dim)] hover:text-[var(--color-ink)]'
             }`}
           >
             <Bot className="h-3.5 w-3.5 text-[var(--color-accent)]" />
             <span>Discord Bot Hosting</span>
           </button>
+          </div>
         </div>
 
         {/* Billing Cycle Switcher */}
@@ -84,7 +88,7 @@ export const Pricing: React.FC<PricingProps> = ({ onNavigate }) => {
           </button>
           <span className={`text-xs flex items-center gap-1.5 ${billingCycle === 'yearly' ? 'text-[var(--color-ink)] font-semibold' : 'text-[var(--color-ink-mute)]'}`}>
             <span>Yearly</span>
-            <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-medium text-[var(--color-ok)] border border-[var(--color-ok)]/40 bg-[var(--color-ok)]/10">
+            <span className="badge badge-success">
               17% OFF
             </span>
           </span>
@@ -117,11 +121,11 @@ export const Pricing: React.FC<PricingProps> = ({ onNavigate }) => {
                   <div className="flex items-center justify-between">
                     <h3 className="text-base font-bold text-[var(--color-ink)]">{p.name}</h3>
                     {isFree ? (
-                      <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-medium text-[var(--color-ok)] border border-[var(--color-ok)]/40 bg-[var(--color-ok)]/10">
+                      <span className="px-1.5 py-0.5 rounded-full text-[11px] uppercase tracking-[0.08em] font-mono font-medium text-[var(--color-ok)] bg-[color-mix(in_srgb,var(--color-ok)_12%,transparent)]">
                         FREE
                       </span>
                     ) : p.isPopular ? (
-                      <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-medium text-[var(--color-accent)] border border-[var(--color-accent)]/40 bg-[var(--color-accent)]/10">
+                      <span className="badge badge-accent">
                         POPULAR
                       </span>
                     ) : null}

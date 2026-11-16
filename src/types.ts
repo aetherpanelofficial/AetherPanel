@@ -695,7 +695,7 @@ export interface CustomThemeSettings {
     bannerUrl?: string;
     loginBgUrl?: string;
   };
-  cardStyle: 'rounded-xl' | 'rounded-2xl' | 'rounded-lg' | 'rounded-none';
+  cardStyle: 'rounded-xl' | 'rounded-2xl' | 'rounded-lg';
   glowIntensity: 'none' | 'subtle' | 'vibrant';
   allowUserCustomization: boolean;
   backgroundBlur?: 'none' | '4px' | '8px' | '12px' | '20px' | '32px' | '40px';

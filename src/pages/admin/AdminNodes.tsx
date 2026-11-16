@@ -35,11 +35,11 @@ export const AdminNodes: React.FC = () => {
   const [viewMode, setViewMode] = useState<'list' | 'create'>('list');
 
   // Flash toasts
-  const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string; onRetry?: () => void } | null>(null);
 
-  const showToast = (type: 'success' | 'error', message: string) => {
-    setToast({ type, message });
-    setTimeout(() => setToast(null), 5000);
+  const showToast = (type: 'success' | 'error', message: string, onRetry?: () => void) => {
+    setToast({ type, message, onRetry });
+    if (!onRetry) setTimeout(() => setToast(null), 5000);
   };
 
   // Create Node Form State
@@ -142,11 +142,11 @@ export const AdminNodes: React.FC = () => {
         fetchNodes();
       } else {
         setPingStatus({ pinging: false, online: false, message: res.error?.message || 'Ping failed' });
-        showToast('error', res.error?.message || 'Ping failed');
+        showToast('error', res.error?.message || 'Ping failed', () => { void handleTestPing(nodeId); });
       }
     } catch (e: any) {
       setPingStatus({ pinging: false, online: false, message: e.message });
-      showToast('error', e.message);
+      showToast('error', e.message, () => { void handleTestPing(nodeId); });
     }
   };
 
@@ -167,8 +167,8 @@ export const AdminNodes: React.FC = () => {
     });
   };
 
-  const handleSaveEdit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSaveEdit = async (e?: React.FormEvent) => {
+    e?.preventDefault();
     if (!editingNode) return;
     if (!editForm.name.trim() || !editForm.hostname.trim()) {
       showToast('error', 'Node name and Hostname/FQDN are required.');
@@ -203,17 +203,17 @@ export const AdminNodes: React.FC = () => {
           openOverview(res.data || { ...viewingNode, ...editForm });
         }
       } else {
-        showToast('error', res.error?.message || 'Failed to update node');
+        showToast('error', res.error?.message || 'Failed to update node', () => { void handleSaveEdit(); });
       }
     } catch (err: any) {
-      showToast('error', err.message || 'Error updating node');
+      showToast('error', err.message || 'Error updating node', () => { void handleSaveEdit(); });
     } finally {
       setSavingEdit(false);
     }
   };
 
-  const handleAddAllocation = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleAddAllocation = async (e?: React.FormEvent) => {
+    e?.preventDefault();
     if (!viewingNode || !newAllocPort.trim()) return;
     const portNum = parseInt(newAllocPort.trim(), 10);
     if (isNaN(portNum) || portNum < 1 || portNum > 65535) {
@@ -237,17 +237,17 @@ export const AdminNodes: React.FC = () => {
         setNewAllocPort('');
         openOverview(viewingNode);
       } else {
-        showToast('error', res.error?.message || 'Failed to allocate port');
+        showToast('error', res.error?.message || 'Failed to allocate port', () => { void handleAddAllocation(); });
       }
     } catch (err: any) {
-      showToast('error', err.message || 'Error adding allocation');
+      showToast('error', err.message || 'Error adding allocation', () => { void handleAddAllocation(); });
     } finally {
       setAddingAlloc(false);
     }
   };
 
-  const handleCreateNode = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleCreateNode = async (e?: React.FormEvent) => {
+    e?.preventDefault();
     if (!formData.name.trim()) {
       showToast('error', 'Node Name is required');
       return;
@@ -306,10 +306,10 @@ export const AdminNodes: React.FC = () => {
         });
         fetchNodes();
       } else {
-        showToast('error', res.error?.message || 'Failed to create node');
+        showToast('error', res.error?.message || 'Failed to create node', () => { void handleCreateNode(); });
       }
     } catch (err: any) {
-      showToast('error', err.message || 'Error creating node');
+      showToast('error', err.message || 'Error creating node', () => { void handleCreateNode(); });
     } finally {
       setSubmitting(false);
     }
@@ -330,7 +330,7 @@ export const AdminNodes: React.FC = () => {
           fetchNodes();
         }
       } catch (e: any) {
-        showToast('error', e.message);
+        showToast('error', e.message, () => { void handleDeleteNode(nodeId, nodeName, true); });
       }
       return;
     }
@@ -345,10 +345,10 @@ export const AdminNodes: React.FC = () => {
         fetchNodes();
         if (viewingNode?.id === nodeId) setViewingNode(null);
       } else {
-        showToast('error', res.error?.message || 'Failed to delete node');
+        showToast('error', res.error?.message || 'Failed to delete node', () => { void handleDeleteNode(nodeId, nodeName); });
       }
     } catch (e: any) {
-      showToast('error', e.message);
+      showToast('error', e.message, () => { void handleDeleteNode(nodeId, nodeName); });
     }
   };
 
@@ -418,6 +418,19 @@ export const AdminNodes: React.FC = () => {
         >
           {toast.type === 'success' ? <Check className="w-4 h-4" /> : <AlertTriangle className="w-4 h-4" />}
           <span>{toast.message}</span>
+          {toast.onRetry && (
+            <button
+              type="button"
+              onClick={() => {
+                const retry = toast.onRetry;
+                setToast(null);
+                retry();
+              }}
+              className="rounded-md border border-[var(--border-1)] px-2 py-1 font-bold hover:bg-white/10"
+            >
+              Retry
+            </button>
+          )}
         </div>
       )}
 
@@ -438,7 +451,7 @@ export const AdminNodes: React.FC = () => {
         {viewMode === 'list' && (
           <button
             onClick={() => setViewMode('create')}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#f97316] hover:bg-[#ea580c] text-white font-semibold text-xs shadow-md shadow-[#f97316]/20 transition-all cursor-pointer"
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white font-semibold text-xs shadow-md shadow-[var(--color-accent)]/20 transition-all cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             <span>Create Node</span>
@@ -449,7 +462,7 @@ export const AdminNodes: React.FC = () => {
       {/* 4 Top Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* TOTAL NODES */}
-        <div className="p-4 rounded-xl bg-[#14151b] border border-[#23252e] flex flex-col justify-between">
+        <div className="p-4 rounded-xl bg-[var(--color-surface-2)] border border-[var(--color-line)] flex flex-col justify-between">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-mono font-medium tracking-wider text-neutral-400 uppercase">
               Total Nodes
@@ -465,7 +478,7 @@ export const AdminNodes: React.FC = () => {
         </div>
 
         {/* ONLINE */}
-        <div className="p-4 rounded-xl bg-[#14151b] border border-emerald-500/30 flex flex-col justify-between">
+        <div className="p-4 rounded-xl bg-[var(--color-surface-2)] border border-emerald-500/30 flex flex-col justify-between">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-mono font-medium tracking-wider text-emerald-400 uppercase">
               Online
@@ -481,7 +494,7 @@ export const AdminNodes: React.FC = () => {
         </div>
 
         {/* OFFLINE */}
-        <div className="p-4 rounded-xl bg-[#14151b] border border-red-500/30 flex flex-col justify-between">
+        <div className="p-4 rounded-xl bg-[var(--color-surface-2)] border border-red-500/30 flex flex-col justify-between">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-mono font-medium tracking-wider text-red-400 uppercase">
               Offline
@@ -497,17 +510,17 @@ export const AdminNodes: React.FC = () => {
         </div>
 
         {/* TOTAL SERVERS */}
-        <div className="p-4 rounded-xl bg-[#14151b] border border-[#f97316]/30 flex flex-col justify-between">
+        <div className="p-4 rounded-xl bg-[var(--color-surface-2)] border border-[var(--color-accent)]/30 flex flex-col justify-between">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-mono font-medium tracking-wider text-[#f97316] uppercase">
+            <span className="text-[11px] font-mono font-medium tracking-wider text-[var(--color-accent)] uppercase">
               Total Servers
             </span>
-            <div className="w-7 h-7 rounded-lg bg-[#f97316]/10 border border-[#f97316]/20 flex items-center justify-center text-[#f97316]">
+            <div className="w-7 h-7 rounded-lg bg-[var(--color-accent)]/10 border border-[var(--color-accent)]/20 flex items-center justify-center text-[var(--color-accent)]">
               <Server className="w-3.5 h-3.5" />
             </div>
           </div>
           <div className="mt-3">
-            <div className="text-2xl font-bold text-[#f97316] font-mono">{totalServersCount}</div>
+            <div className="text-2xl font-bold text-[var(--color-accent)] font-mono">{totalServersCount}</div>
             <div className="text-[11px] text-neutral-500 mt-0.5">across all nodes</div>
           </div>
         </div>
@@ -519,13 +532,13 @@ export const AdminNodes: React.FC = () => {
           <div className="flex items-center gap-3">
             <button
               onClick={() => setViewMode('list')}
-              className="p-2 rounded-lg bg-[#14151b] border border-[#23252e] text-neutral-400 hover:text-white transition-colors cursor-pointer"
+              className="p-2 rounded-lg bg-[var(--color-surface-2)] border border-[var(--color-line)] text-neutral-400 hover:text-white transition-colors cursor-pointer"
             >
               <ArrowLeft className="w-4 h-4" />
             </button>
             <div>
               <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                <Plus className="w-5 h-5 text-[#f97316]" /> Create Node
+                <Plus className="w-5 h-5 text-[var(--color-accent)]" /> Create Node
               </h2>
               <p className="text-xs text-neutral-400">Register a new daemon node for distributed hosting</p>
             </div>
@@ -535,9 +548,9 @@ export const AdminNodes: React.FC = () => {
             {/* Left 2 Columns: Form Fields */}
             <div className="lg:col-span-2 space-y-6">
               {/* Card 1: BASIC INFORMATION */}
-              <div className="p-5 rounded-xl bg-[#14151b] border border-[#23252e] space-y-4">
-                <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-neutral-400 font-semibold border-b border-[#23252e] pb-3">
-                  <Activity className="w-4 h-4 text-[#f97316]" />
+              <div className="p-5 rounded-xl bg-[var(--color-surface-2)] border border-[var(--color-line)] space-y-4">
+                <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-neutral-400 font-semibold border-b border-[var(--color-line)] pb-3">
+                  <Activity className="w-4 h-4 text-[var(--color-accent)]" />
                   <span>Basic Information</span>
                 </div>
 
@@ -552,7 +565,7 @@ export const AdminNodes: React.FC = () => {
                       placeholder="e.g. IN-1 or US-East-1"
                       value={formData.name}
                       onChange={e => setFormData({ ...formData, name: e.target.value })}
-                      className="w-full px-3 py-2 rounded-lg bg-[#0c0d12] border border-[#23252e] text-white text-xs focus:outline-none focus:border-[#f97316]"
+                      className="w-full px-3 py-2 rounded-lg bg-[var(--color-surface-0)] border border-[var(--color-line)] text-white text-xs focus:outline-none focus:border-[var(--color-accent)]"
                     />
                   </div>
 
@@ -565,7 +578,7 @@ export const AdminNodes: React.FC = () => {
                         placeholder="US"
                         value={formData.countryCode}
                         onChange={e => setFormData({ ...formData, countryCode: e.target.value.toUpperCase() })}
-                        className="w-full pl-3 pr-10 py-2 rounded-lg bg-[#0c0d12] border border-[#23252e] text-white text-xs uppercase font-mono focus:outline-none focus:border-[#f97316]"
+                        className="w-full pl-3 pr-10 py-2 rounded-lg bg-[var(--color-surface-0)] border border-[var(--color-line)] text-white text-xs uppercase font-mono focus:outline-none focus:border-[var(--color-accent)]"
                       />
                       <span className="absolute right-3 text-base">
                         {getFlagEmoji(formData.countryCode)}
@@ -582,7 +595,7 @@ export const AdminNodes: React.FC = () => {
                     placeholder="Optional description of this node (e.g. Dedicated AMD Ryzen 9 7950X, 128GB RAM)"
                     value={formData.description}
                     onChange={e => setFormData({ ...formData, description: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg bg-[#0c0d12] border border-[#23252e] text-white text-xs focus:outline-none focus:border-[#f97316]"
+                    className="w-full px-3 py-2 rounded-lg bg-[var(--color-surface-0)] border border-[var(--color-line)] text-white text-xs focus:outline-none focus:border-[var(--color-accent)]"
                   />
                   <span className="text-[10px] text-neutral-500 font-mono">Optional — max 1000 characters</span>
                 </div>
@@ -594,15 +607,15 @@ export const AdminNodes: React.FC = () => {
                     placeholder="e.g. Asia, Frankfurt, Mumbai, New York"
                     value={formData.location}
                     onChange={e => setFormData({ ...formData, location: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg bg-[#0c0d12] border border-[#23252e] text-white text-xs focus:outline-none focus:border-[#f97316]"
+                    className="w-full px-3 py-2 rounded-lg bg-[var(--color-surface-0)] border border-[var(--color-line)] text-white text-xs focus:outline-none focus:border-[var(--color-accent)]"
                   />
                 </div>
               </div>
 
               {/* Card 2: NETWORK CONFIGURATION */}
-              <div className="p-5 rounded-xl bg-[#14151b] border border-[#23252e] space-y-4">
-                <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-neutral-400 font-semibold border-b border-[#23252e] pb-3">
-                  <Globe className="w-4 h-4 text-[#f97316]" />
+              <div className="p-5 rounded-xl bg-[var(--color-surface-2)] border border-[var(--color-line)] space-y-4">
+                <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-neutral-400 font-semibold border-b border-[var(--color-line)] pb-3">
+                  <Globe className="w-4 h-4 text-[var(--color-accent)]" />
                   <span>Network Configuration</span>
                 </div>
 
@@ -617,7 +630,7 @@ export const AdminNodes: React.FC = () => {
                       placeholder="localhost, 127.0.0.1, or node.znx.xyz.com"
                       value={formData.hostname}
                       onChange={e => setFormData({ ...formData, hostname: e.target.value })}
-                      className="w-full px-3 py-2 rounded-lg bg-[#0c0d12] border border-[#23252e] text-white text-xs font-mono focus:outline-none focus:border-[#f97316]"
+                      className="w-full px-3 py-2 rounded-lg bg-[var(--color-surface-0)] border border-[var(--color-line)] text-white text-xs font-mono focus:outline-none focus:border-[var(--color-accent)]"
                     />
                     <span className="text-[10px] text-neutral-500 font-mono">IPv4, IPv6, localhost, or FQDN</span>
                   </div>
@@ -632,7 +645,7 @@ export const AdminNodes: React.FC = () => {
                       placeholder="9666"
                       value={formData.daemonPort}
                       onChange={e => setFormData({ ...formData, daemonPort: parseInt(e.target.value) || 9666 })}
-                      className="w-full px-3 py-2 rounded-lg bg-[#0c0d12] border border-[#23252e] text-white text-xs font-mono focus:outline-none focus:border-[#f97316]"
+                      className="w-full px-3 py-2 rounded-lg bg-[var(--color-surface-0)] border border-[var(--color-line)] text-white text-xs font-mono focus:outline-none focus:border-[var(--color-accent)]"
                     />
                     <span className="text-[10px] text-neutral-500 font-mono">Default: 9666</span>
                   </div>
@@ -645,16 +658,16 @@ export const AdminNodes: React.FC = () => {
                     placeholder="e.g. play.example.com or node1.myhost.net"
                     value={formData.ipAlias}
                     onChange={e => setFormData({ ...formData, ipAlias: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg bg-[#0c0d12] border border-[#23252e] text-white text-xs focus:outline-none focus:border-[#f97316]"
+                    className="w-full px-3 py-2 rounded-lg bg-[var(--color-surface-0)] border border-[var(--color-line)] text-white text-xs focus:outline-none focus:border-[var(--color-accent)]"
                   />
                   <span className="text-[10px] text-neutral-500 font-mono">Shown to users instead of the raw IP</span>
                 </div>
               </div>
 
               {/* Card 3: RESOURCE CAPACITY */}
-              <div className="p-5 rounded-xl bg-[#14151b] border border-[#23252e] space-y-4">
-                <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-neutral-400 font-semibold border-b border-[#23252e] pb-3">
-                  <Cpu className="w-4 h-4 text-[#f97316]" />
+              <div className="p-5 rounded-xl bg-[var(--color-surface-2)] border border-[var(--color-line)] space-y-4">
+                <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-neutral-400 font-semibold border-b border-[var(--color-line)] pb-3">
+                  <Cpu className="w-4 h-4 text-[var(--color-accent)]" />
                   <span>Hardware Allocation Limits</span>
                 </div>
 
@@ -665,7 +678,7 @@ export const AdminNodes: React.FC = () => {
                       type="number"
                       value={formData.memory}
                       onChange={e => setFormData({ ...formData, memory: parseInt(e.target.value) || 1024 })}
-                      className="w-full px-3 py-2 rounded-lg bg-[#0c0d12] border border-[#23252e] text-white text-xs font-mono"
+                      className="w-full px-3 py-2 rounded-lg bg-[var(--color-surface-0)] border border-[var(--color-line)] text-white text-xs font-mono"
                     />
                   </div>
 
@@ -675,7 +688,7 @@ export const AdminNodes: React.FC = () => {
                       type="number"
                       value={formData.disk}
                       onChange={e => setFormData({ ...formData, disk: parseInt(e.target.value) || 1024 })}
-                      className="w-full px-3 py-2 rounded-lg bg-[#0c0d12] border border-[#23252e] text-white text-xs font-mono"
+                      className="w-full px-3 py-2 rounded-lg bg-[var(--color-surface-0)] border border-[var(--color-line)] text-white text-xs font-mono"
                     />
                   </div>
 
@@ -685,7 +698,7 @@ export const AdminNodes: React.FC = () => {
                       type="number"
                       value={formData.cpu}
                       onChange={e => setFormData({ ...formData, cpu: parseInt(e.target.value) || 100 })}
-                      className="w-full px-3 py-2 rounded-lg bg-[#0c0d12] border border-[#23252e] text-white text-xs font-mono"
+                      className="w-full px-3 py-2 rounded-lg bg-[var(--color-surface-0)] border border-[var(--color-line)] text-white text-xs font-mono"
                     />
                   </div>
 
@@ -695,25 +708,25 @@ export const AdminNodes: React.FC = () => {
                       type="number"
                       value={formData.maxServers}
                       onChange={e => setFormData({ ...formData, maxServers: parseInt(e.target.value) || 10 })}
-                      className="w-full px-3 py-2 rounded-lg bg-[#0c0d12] border border-[#23252e] text-white text-xs font-mono"
+                      className="w-full px-3 py-2 rounded-lg bg-[var(--color-surface-0)] border border-[var(--color-line)] text-white text-xs font-mono"
                     />
                   </div>
                 </div>
               </div>
 
               {/* Card 4: PORT RANGES */}
-              <div className="p-5 rounded-xl bg-[#14151b] border border-[#23252e] space-y-4">
-                <div className="flex items-center justify-between border-b border-[#23252e] pb-3">
+              <div className="p-5 rounded-xl bg-[var(--color-surface-2)] border border-[var(--color-line)] space-y-4">
+                <div className="flex items-center justify-between border-b border-[var(--color-line)] pb-3">
                   <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-neutral-400 font-semibold">
-                    <Layers className="w-4 h-4 text-[#f97316]" />
+                    <Layers className="w-4 h-4 text-[var(--color-accent)]" />
                     <span>Port Ranges</span>
                   </div>
                   <button
                     type="button"
                     onClick={handleAddRange}
-                    className="flex items-center gap-1.5 px-3 py-1 rounded bg-[#0c0d12] border border-[#23252e] text-xs text-neutral-300 hover:text-white hover:bg-[#1e2029] cursor-pointer"
+                    className="flex items-center gap-1.5 px-3 py-1 rounded bg-[var(--color-surface-0)] border border-[var(--color-line)] text-xs text-neutral-300 hover:text-white hover:bg-[var(--color-surface-3)] cursor-pointer"
                   >
-                    <Plus className="w-3.5 h-3.5 text-[#f97316]" />
+                    <Plus className="w-3.5 h-3.5 text-[var(--color-accent)]" />
                     <span>Add Range</span>
                   </button>
                 </div>
@@ -735,7 +748,7 @@ export const AdminNodes: React.FC = () => {
                             newRanges[idx].startPort = parseInt(e.target.value) || 0;
                             setFormData({ ...formData, portRanges: newRanges });
                           }}
-                          className="w-full px-3 py-2 rounded-lg bg-[#0c0d12] border border-[#23252e] text-white text-xs font-mono"
+                          className="w-full px-3 py-2 rounded-lg bg-[var(--color-surface-0)] border border-[var(--color-line)] text-white text-xs font-mono"
                         />
                       </div>
                       <div className="flex-1 space-y-1">
@@ -748,7 +761,7 @@ export const AdminNodes: React.FC = () => {
                             newRanges[idx].endPort = parseInt(e.target.value) || 0;
                             setFormData({ ...formData, portRanges: newRanges });
                           }}
-                          className="w-full px-3 py-2 rounded-lg bg-[#0c0d12] border border-[#23252e] text-white text-xs font-mono"
+                          className="w-full px-3 py-2 rounded-lg bg-[var(--color-surface-0)] border border-[var(--color-line)] text-white text-xs font-mono"
                         />
                       </div>
                       {formData.portRanges.length > 1 && (
@@ -770,14 +783,14 @@ export const AdminNodes: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setViewMode('list')}
-                  className="px-4 py-2 rounded-lg bg-[#14151b] border border-[#23252e] text-neutral-300 text-xs font-medium hover:text-white cursor-pointer"
+                  className="px-4 py-2 rounded-lg bg-[var(--color-surface-2)] border border-[var(--color-line)] text-neutral-300 text-xs font-medium hover:text-white cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="px-6 py-2 rounded-lg bg-[#f97316] hover:bg-[#ea580c] text-white font-semibold text-xs shadow-md shadow-[#f97316]/20 transition-all cursor-pointer disabled:opacity-50"
+                  className="px-6 py-2 rounded-lg bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white font-semibold text-xs shadow-md shadow-[var(--color-accent)]/20 transition-all cursor-pointer disabled:opacity-50"
                 >
                   {submitting ? 'Creating Node...' : 'Create Node'}
                 </button>
@@ -787,17 +800,17 @@ export const AdminNodes: React.FC = () => {
             {/* Right Column: Setup Guide & Security Notes */}
             <div className="space-y-6">
               {/* Setup Guide */}
-              <div className="p-5 rounded-xl bg-[#14151b] border border-[#23252e] space-y-3">
-                <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-neutral-400 font-semibold border-b border-[#23252e] pb-2">
-                  <Zap className="w-4 h-4 text-[#f97316]" />
+              <div className="p-5 rounded-xl bg-[var(--color-surface-2)] border border-[var(--color-line)] space-y-3">
+                <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-neutral-400 font-semibold border-b border-[var(--color-line)] pb-2">
+                  <Zap className="w-4 h-4 text-[var(--color-accent)]" />
                   <span>Setup Guide</span>
                 </div>
                 <div className="space-y-2 text-xs text-neutral-300">
                   <p>1. Fill in the node details</p>
                   <p>2. Click <strong className="text-white">Create Node</strong></p>
-                  <p>3. Copy the generated <strong className="text-[#f97316]">token</strong> (shown once)</p>
+                  <p>3. Copy the generated <strong className="text-[var(--color-accent)]">token</strong> (shown once)</p>
                   <p>4. Install the daemon on the remote server:</p>
-                  <div className="p-2 rounded bg-[#0c0d12] border border-[#23252e] font-mono text-[10px] text-neutral-300">
+                  <div className="p-2 rounded bg-[var(--color-surface-0)] border border-[var(--color-line)] font-mono text-[10px] text-neutral-300">
                     node agent.js
                   </div>
                   <p>5. Configure the daemon with the token and panel URL</p>
@@ -806,8 +819,8 @@ export const AdminNodes: React.FC = () => {
               </div>
 
               {/* Security Notes */}
-              <div className="p-5 rounded-xl bg-[#14151b] border border-[#23252e] space-y-3">
-                <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-neutral-400 font-semibold border-b border-[#23252e] pb-2">
+              <div className="p-5 rounded-xl bg-[var(--color-surface-2)] border border-[var(--color-line)] space-y-3">
+                <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-neutral-400 font-semibold border-b border-[var(--color-line)] pb-2">
                   <ShieldCheck className="w-4 h-4 text-emerald-400" />
                   <span>Security Notes</span>
                 </div>
@@ -832,10 +845,10 @@ export const AdminNodes: React.FC = () => {
       ) : (
         /* VIEW: NODES LIST (Spacious, full-width) */
         <div className="space-y-4">
-          <div className="p-5 rounded-xl bg-[#14151b] border border-[#23252e]">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 mb-4 border-b border-[#23252e]">
+          <div className="p-5 rounded-xl bg-[var(--color-surface-2)] border border-[var(--color-line)]">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 mb-4 border-b border-[var(--color-line)]">
               <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-neutral-400 font-semibold">
-                <Layers className="w-4 h-4 text-[#f97316]" />
+                <Layers className="w-4 h-4 text-[var(--color-accent)]" />
                 <span>All Nodes</span>
               </div>
 
@@ -848,22 +861,30 @@ export const AdminNodes: React.FC = () => {
                     placeholder="Search nodes by name or IP..."
                     value={searchQuery}
                     onChange={e => setSearchQuery(e.target.value)}
-                    className="pl-8 pr-3 py-1.5 rounded-lg bg-[#0c0d12] border border-[#23252e] text-white text-xs placeholder-neutral-500 focus:outline-none focus:border-[#f97316] w-56"
+                    className="pl-8 pr-3 py-1.5 rounded-lg bg-[var(--color-surface-0)] border border-[var(--color-line)] text-white text-xs placeholder-neutral-500 focus:outline-none focus:border-[var(--color-accent)] w-56"
                   />
                 </div>
 
                 <button
                   onClick={fetchNodes}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#0c0d12] border border-[#23252e] text-xs text-neutral-300 hover:text-white hover:bg-[#181920] transition-colors cursor-pointer"
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[var(--color-surface-0)] border border-[var(--color-line)] text-xs text-neutral-300 hover:text-white hover:bg-[var(--color-surface-2)] transition-colors cursor-pointer"
                 >
-                  <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-[#f97316]' : ''}`} />
+                  <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-[var(--color-accent)]' : ''}`} />
                   <span>Refresh</span>
                 </button>
               </div>
             </div>
 
             {/* Empty State when no nodes exist */}
-            {nodes.length === 0 ? (
+            {loading ? (
+              <div className="space-y-3 py-4" aria-label="Loading nodes">
+                {[0, 1, 2].map(row => (
+                  <div key={row} className="grid grid-cols-4 gap-4 rounded-lg border border-[var(--color-line)] p-4" aria-hidden="true">
+                    {[0, 1, 2, 3].map(cell => <span key={cell} className="h-3 animate-pulse rounded bg-[var(--color-surface-3)]" />)}
+                  </div>
+                ))}
+              </div>
+            ) : nodes.length === 0 ? (
               <div className="py-16 text-center space-y-4">
                 <div className="w-12 h-12 rounded-2xl bg-neutral-800/60 border border-neutral-700 mx-auto flex items-center justify-center text-neutral-400">
                   <HardDrive className="w-6 h-6" />
@@ -876,10 +897,18 @@ export const AdminNodes: React.FC = () => {
                 </div>
                 <button
                   onClick={() => setViewMode('create')}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#f97316] hover:bg-[#ea580c] text-white font-semibold text-xs shadow-md shadow-[#f97316]/20 transition-all cursor-pointer"
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white font-semibold text-xs shadow-md shadow-[var(--color-accent)]/20 transition-all cursor-pointer"
                 >
                   <Plus className="w-4 h-4" />
                   <span>Create your first node</span>
+                </button>
+              </div>
+            ) : filteredNodes.length === 0 ? (
+              <div className="py-16 text-center space-y-3">
+                <h3 className="text-sm font-bold text-[var(--color-ink)]">No matching nodes</h3>
+                <p className="text-xs text-[var(--color-ink-dim)]">Clear the search to see all nodes.</p>
+                <button type="button" onClick={() => setSearchQuery('')} className="btn-primary rounded-lg px-4 py-2 text-xs font-semibold">
+                  Clear search
                 </button>
               </div>
             ) : (
@@ -887,7 +916,7 @@ export const AdminNodes: React.FC = () => {
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
                   <thead>
-                    <tr className="border-b border-[#23252e] text-neutral-400 font-mono uppercase text-[10px]">
+                    <tr className="border-b border-[var(--color-line)] text-neutral-400 font-mono uppercase text-[10px]">
                       <th className="pb-3 font-medium">Node</th>
                       <th className="pb-3 font-medium">Address</th>
                       <th className="pb-3 font-medium">Status</th>
@@ -898,14 +927,14 @@ export const AdminNodes: React.FC = () => {
                       <th className="pb-3 font-medium text-right">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-[#23252e]/50">
+                  <tbody className="divide-y divide-[var(--color-line)]/50">
                     {filteredNodes.map(node => {
                       const healthStatus = node.healthStatus || 'unknown';
                       const isOnline = healthStatus === 'online';
                       const isOffline = healthStatus === 'offline';
                       const isMaint = node.maintenanceMode || node.status === 'maintenance';
                       return (
-                        <tr key={node.id} className="hover:bg-[#181920]/50 transition-colors">
+                        <tr key={node.id} className="hover:bg-[var(--color-surface-2)]/50 transition-colors">
                           <td className="py-3">
                             <div className="flex items-center gap-3">
                               <span className="text-lg">{getFlagEmoji(node.flagCode || (node.isLocal ? 'LOCAL' : 'US'))}</span>
@@ -913,7 +942,7 @@ export const AdminNodes: React.FC = () => {
                                 <div className="font-bold text-white flex items-center gap-2">
                                   <span>{node.name}</span>
                                   {node.isLocal && (
-                                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[#f97316]/10 text-[#f97316] border border-[#f97316]/20">
+                                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[var(--color-accent)]/10 text-[var(--color-accent)] border border-[var(--color-accent)]/20">
                                       LOCAL
                                     </span>
                                   )}
@@ -967,8 +996,9 @@ export const AdminNodes: React.FC = () => {
                               {/* View Overview Button */}
                               <button
                                 onClick={() => openOverview(node)}
-                                className="p-1.5 text-neutral-400 hover:text-white transition-colors rounded hover:bg-[#23252e] cursor-pointer"
+                                className="p-1.5 text-neutral-400 hover:text-white transition-colors rounded hover:bg-[var(--color-line)] cursor-pointer"
                                 title="Node Overview & Telemetry"
+                                aria-label={`View ${node.name} overview and telemetry`}
                               >
                                 <Eye className="w-3.5 h-3.5" />
                               </button>
@@ -976,8 +1006,9 @@ export const AdminNodes: React.FC = () => {
                               {/* Edit Node Button */}
                               <button
                                 onClick={() => openEdit(node)}
-                                className="p-1.5 text-neutral-400 hover:text-[#f97316] transition-colors rounded hover:bg-[#23252e] cursor-pointer"
+                                className="p-1.5 text-neutral-400 hover:text-[var(--color-accent)] transition-colors rounded hover:bg-[var(--color-line)] cursor-pointer"
                                 title="Edit Node Configuration"
+                                aria-label={`Edit ${node.name}`}
                               >
                                 <Edit3 className="w-3.5 h-3.5" />
                               </button>
@@ -985,8 +1016,9 @@ export const AdminNodes: React.FC = () => {
                               {/* Delete Button */}
                               <button
                                 onClick={() => handleDeleteNode(node.id, node.name, node.isLocal)}
-                                className="p-1.5 text-neutral-400 hover:text-red-400 transition-colors rounded hover:bg-[#23252e] cursor-pointer"
+                                className="p-1.5 text-neutral-400 hover:text-red-400 transition-colors rounded hover:bg-[var(--color-line)] cursor-pointer"
                                 title={node.isLocal ? "Local Node Protection" : "Delete Node"}
+                                aria-label={node.isLocal ? `Local node protection for ${node.name}` : `Delete ${node.name}`}
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                               </button>
@@ -1006,7 +1038,7 @@ export const AdminNodes: React.FC = () => {
       {/* ANIMATED TOKEN PRESENTATION POPUP */}
       {tokenModal && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-lg rounded-2xl bg-[#14151b] border border-[#23252e] p-6 space-y-5 shadow-2xl relative animate-in fade-in zoom-in-95 duration-200">
+          <div className="w-full max-w-lg rounded-2xl bg-[var(--color-surface-2)] border border-[var(--color-line)] p-6 space-y-5 shadow-2xl relative animate-in fade-in zoom-in-95 duration-200">
             {/* Header with Gold Key Icon */}
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
@@ -1025,12 +1057,13 @@ export const AdminNodes: React.FC = () => {
             </div>
 
             {/* Token box */}
-            <div className="p-3 rounded-lg bg-[#0c0d12] border border-[#23252e] font-mono text-xs text-amber-300 break-all select-all flex items-center justify-between gap-2">
+            <div className="p-3 rounded-lg bg-[var(--color-surface-0)] border border-[var(--color-line)] font-mono text-xs text-amber-300 break-all select-all flex items-center justify-between gap-2">
               <span>{tokenModal.token}</span>
               <button
                 onClick={() => copyToClipboard(tokenModal.token)}
                 className="p-1.5 text-neutral-400 hover:text-white shrink-0 cursor-pointer"
                 title="Copy Token"
+                aria-label="Copy node token"
               >
                 {copiedToken ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
               </button>
@@ -1041,7 +1074,7 @@ export const AdminNodes: React.FC = () => {
               <div className="text-[10px] font-mono uppercase text-neutral-400 font-semibold">
                 Daemon Configuration
               </div>
-              <div className="p-3 rounded-lg bg-[#0c0d12] border border-[#23252e] font-mono text-xs text-emerald-400 space-y-1 select-all relative">
+              <div className="p-3 rounded-lg bg-[var(--color-surface-0)] border border-[var(--color-line)] font-mono text-xs text-emerald-400 space-y-1 select-all relative">
                 <div>PANEL_URL={tokenModal.panelUrl}</div>
                 <div>NODE_TOKEN={tokenModal.token}</div>
                 <div>NODE_ID={tokenModal.nodeId}</div>
@@ -1063,7 +1096,7 @@ export const AdminNodes: React.FC = () => {
                   setTokenModal(null);
                   setViewMode('list');
                 }}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-[#f97316] hover:bg-[#ea580c] text-white font-semibold text-xs shadow-md shadow-[#f97316]/20 transition-all cursor-pointer"
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white font-semibold text-xs shadow-md shadow-[var(--color-accent)]/20 transition-all cursor-pointer"
               >
                 <Copy className="w-4 h-4" />
                 <span>Copy Token & Continue</span>
@@ -1074,7 +1107,7 @@ export const AdminNodes: React.FC = () => {
                   setTokenModal(null);
                   setViewMode('list');
                 }}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-[#0c0d12] border border-[#23252e] text-neutral-300 font-medium text-xs hover:text-white hover:bg-[#181920] transition-colors cursor-pointer"
+                className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-[var(--color-surface-0)] border border-[var(--color-line)] text-neutral-300 font-medium text-xs hover:text-white hover:bg-[var(--color-surface-2)] transition-colors cursor-pointer"
               >
                 <span>Go to Nodes List</span>
                 <ArrowRight className="w-4 h-4" />
@@ -1087,16 +1120,16 @@ export const AdminNodes: React.FC = () => {
       {/* COMPREHENSIVE NODE OVERVIEW MODAL */}
       {viewingNode && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-2xl bg-[#14151b] border border-[#23252e] p-6 space-y-6 shadow-2xl relative animate-in fade-in zoom-in-95 duration-200">
+          <div className="w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-2xl bg-[var(--color-surface-2)] border border-[var(--color-line)] p-6 space-y-6 shadow-2xl relative animate-in fade-in zoom-in-95 duration-200">
             {/* Header */}
-            <div className="flex items-center justify-between border-b border-[#23252e] pb-4">
+            <div className="flex items-center justify-between border-b border-[var(--color-line)] pb-4">
               <div className="flex items-center gap-3">
                 <span className="text-2xl">{getFlagEmoji(viewingNode.flagCode || (viewingNode.isLocal ? 'LOCAL' : 'US'))}</span>
                 <div>
                   <div className="flex items-center gap-2">
                     <h3 className="text-lg font-bold text-white">{viewingNode.name}</h3>
                     {viewingNode.isLocal && (
-                      <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#f97316]/10 text-[#f97316] border border-[#f97316]/20">
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[var(--color-accent)]/10 text-[var(--color-accent)] border border-[var(--color-accent)]/20">
                         LOCAL
                       </span>
                     )}
@@ -1121,15 +1154,15 @@ export const AdminNodes: React.FC = () => {
                 <button
                   onClick={() => handleTestPing(viewingNode.id)}
                   disabled={pingStatus?.pinging}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#0c0d12] border border-[#23252e] text-xs font-mono text-neutral-300 hover:text-white hover:bg-[#181920] cursor-pointer disabled:opacity-50"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--color-surface-0)] border border-[var(--color-line)] text-xs font-mono text-neutral-300 hover:text-white hover:bg-[var(--color-surface-2)] cursor-pointer disabled:opacity-50"
                 >
-                  <Activity className={`w-3.5 h-3.5 ${pingStatus?.pinging ? 'animate-spin text-[#f97316]' : 'text-emerald-400'}`} />
+                  <Activity className={`w-3.5 h-3.5 ${pingStatus?.pinging ? 'animate-spin text-[var(--color-accent)]' : 'text-emerald-400'}`} />
                   <span>{pingStatus?.pinging ? 'Pinging...' : 'Test Ping'}</span>
                 </button>
 
                 <button
                   onClick={() => openEdit(viewingNode)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#0c0d12] border border-[#23252e] text-xs text-neutral-300 hover:text-[#f97316] hover:bg-[#181920] cursor-pointer"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--color-surface-0)] border border-[var(--color-line)] text-xs text-neutral-300 hover:text-[var(--color-accent)] hover:bg-[var(--color-surface-2)] cursor-pointer"
                 >
                   <Edit3 className="w-3.5 h-3.5" />
                   <span>Edit</span>
@@ -1137,7 +1170,8 @@ export const AdminNodes: React.FC = () => {
 
                 <button
                   onClick={() => setViewingNode(null)}
-                  className="p-1.5 text-neutral-400 hover:text-white rounded-lg hover:bg-[#23252e] cursor-pointer"
+                  className="p-1.5 text-neutral-400 hover:text-white rounded-lg hover:bg-[var(--color-line)] cursor-pointer"
+                  aria-label="Close node overview"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -1161,13 +1195,13 @@ export const AdminNodes: React.FC = () => {
             )}
 
             {/* Navigation Tabs inside Overview */}
-            <div className="flex items-center gap-2 border-b border-[#23252e] pb-2">
+            <div className="flex items-center gap-2 border-b border-[var(--color-line)] pb-2">
               <button
                 onClick={() => setViewTab('overview')}
                 className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
                   viewTab === 'overview'
-                    ? 'bg-[#f97316]/15 text-[#f97316] border border-[#f97316]/40 font-semibold'
-                    : 'text-neutral-400 hover:text-white hover:bg-[#181920]'
+                    ? 'bg-[var(--color-accent)]/15 text-[var(--color-accent)] border border-[var(--color-accent)]/40 font-semibold'
+                    : 'text-neutral-400 hover:text-white hover:bg-[var(--color-surface-2)]'
                 }`}
               >
                 Telemetry & Gauges
@@ -1176,8 +1210,8 @@ export const AdminNodes: React.FC = () => {
                 onClick={() => setViewTab('servers')}
                 className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
                   viewTab === 'servers'
-                    ? 'bg-[#f97316]/15 text-[#f97316] border border-[#f97316]/40 font-semibold'
-                    : 'text-neutral-400 hover:text-white hover:bg-[#181920]'
+                    ? 'bg-[var(--color-accent)]/15 text-[var(--color-accent)] border border-[var(--color-accent)]/40 font-semibold'
+                    : 'text-neutral-400 hover:text-white hover:bg-[var(--color-surface-2)]'
                 }`}
               >
                 Servers ({viewingNode.serverCount || viewingNode.servers?.length || 0})
@@ -1186,8 +1220,8 @@ export const AdminNodes: React.FC = () => {
                 onClick={() => setViewTab('allocations')}
                 className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
                   viewTab === 'allocations'
-                    ? 'bg-[#f97316]/15 text-[#f97316] border border-[#f97316]/40 font-semibold'
-                    : 'text-neutral-400 hover:text-white hover:bg-[#181920]'
+                    ? 'bg-[var(--color-accent)]/15 text-[var(--color-accent)] border border-[var(--color-accent)]/40 font-semibold'
+                    : 'text-neutral-400 hover:text-white hover:bg-[var(--color-surface-2)]'
                 }`}
               >
                 Allocations ({viewingNode.allocationsCount?.total || viewingNode.allocations?.length || 0})
@@ -1196,8 +1230,8 @@ export const AdminNodes: React.FC = () => {
                 onClick={() => setViewTab('config')}
                 className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
                   viewTab === 'config'
-                    ? 'bg-[#f97316]/15 text-[#f97316] border border-[#f97316]/40 font-semibold'
-                    : 'text-neutral-400 hover:text-white hover:bg-[#181920]'
+                    ? 'bg-[var(--color-accent)]/15 text-[var(--color-accent)] border border-[var(--color-accent)]/40 font-semibold'
+                    : 'text-neutral-400 hover:text-white hover:bg-[var(--color-surface-2)]'
                 }`}
               >
                 Daemon Config
@@ -1210,7 +1244,7 @@ export const AdminNodes: React.FC = () => {
                 {/* 3 Live Hardware Gauges */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {/* Memory Gauge */}
-                  <div className="p-4 rounded-xl bg-[#0c0d12] border border-[#23252e] space-y-3">
+                  <div className="p-4 rounded-xl bg-[var(--color-surface-0)] border border-[var(--color-line)] space-y-3">
                     <div className="flex items-center justify-between text-xs text-neutral-400">
                       <span className="font-mono uppercase font-semibold">Memory Allocated</span>
                       <Cpu className="w-4 h-4 text-emerald-400" />
@@ -1219,7 +1253,7 @@ export const AdminNodes: React.FC = () => {
                       <div className="text-xl font-bold font-mono text-white">
                         {viewingNode.usedRamMB || 0} / {viewingNode.totalRamMB || viewingNode.memory || 4096} MB
                       </div>
-                      <div className="w-full bg-[#1e2029] h-2 rounded-full mt-2 overflow-hidden">
+                      <div className="w-full bg-[var(--color-surface-3)] h-2 rounded-full mt-2 overflow-hidden">
                         <div
                           className="bg-emerald-500 h-full rounded-full transition-all"
                           style={{
@@ -1234,7 +1268,7 @@ export const AdminNodes: React.FC = () => {
                   </div>
 
                   {/* Disk Gauge */}
-                  <div className="p-4 rounded-xl bg-[#0c0d12] border border-[#23252e] space-y-3">
+                  <div className="p-4 rounded-xl bg-[var(--color-surface-0)] border border-[var(--color-line)] space-y-3">
                     <div className="flex items-center justify-between text-xs text-neutral-400">
                       <span className="font-mono uppercase font-semibold">Disk Allocated</span>
                       <HardDrive className="w-4 h-4 text-amber-400" />
@@ -1243,7 +1277,7 @@ export const AdminNodes: React.FC = () => {
                       <div className="text-xl font-bold font-mono text-white">
                         {viewingNode.usedDiskGB || 0} / {viewingNode.totalDiskGB || Math.round((viewingNode.disk || 102400) / 1024)} GB
                       </div>
-                      <div className="w-full bg-[#1e2029] h-2 rounded-full mt-2 overflow-hidden">
+                      <div className="w-full bg-[var(--color-surface-3)] h-2 rounded-full mt-2 overflow-hidden">
                         <div
                           className="bg-amber-500 h-full rounded-full transition-all"
                           style={{
@@ -1258,10 +1292,10 @@ export const AdminNodes: React.FC = () => {
                   </div>
 
                   {/* CPU Gauge */}
-                  <div className="p-4 rounded-xl bg-[#0c0d12] border border-[#23252e] space-y-3">
+                  <div className="p-4 rounded-xl bg-[var(--color-surface-0)] border border-[var(--color-line)] space-y-3">
                     <div className="flex items-center justify-between text-xs text-neutral-400">
                       <span className="font-mono uppercase font-semibold">CPU Cores & Threads</span>
-                      <Activity className="w-4 h-4 text-[#f97316]" />
+                      <Activity className="w-4 h-4 text-[var(--color-accent)]" />
                     </div>
                     <div>
                       <div className="text-xl font-bold font-mono text-white">
@@ -1278,7 +1312,7 @@ export const AdminNodes: React.FC = () => {
                 </div>
 
                 {/* Node Metadata & Connection Card */}
-                <div className="p-4 rounded-xl bg-[#0c0d12] border border-[#23252e] space-y-3">
+                <div className="p-4 rounded-xl bg-[var(--color-surface-0)] border border-[var(--color-line)] space-y-3">
                   <div className="text-xs font-mono uppercase tracking-wider text-neutral-400 font-semibold">
                     Node Metadata & Connectivity
                   </div>
@@ -1314,7 +1348,7 @@ export const AdminNodes: React.FC = () => {
                   <div className="overflow-x-auto">
                     <table className="w-full text-left text-xs">
                       <thead>
-                        <tr className="border-b border-[#23252e] text-neutral-400 font-mono uppercase text-[10px]">
+                        <tr className="border-b border-[var(--color-line)] text-neutral-400 font-mono uppercase text-[10px]">
                           <th className="pb-2 font-medium">Server Name</th>
                           <th className="pb-2 font-medium">Port</th>
                           <th className="pb-2 font-medium">Status</th>
@@ -1322,9 +1356,9 @@ export const AdminNodes: React.FC = () => {
                           <th className="pb-2 font-medium">Disk Limit</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-[#23252e]/50 font-mono">
+                      <tbody className="divide-y divide-[var(--color-line)]/50 font-mono">
                         {viewingNode.servers.map(srv => (
-                          <tr key={srv.id} className="hover:bg-[#181920]/40">
+                          <tr key={srv.id} className="hover:bg-[var(--color-surface-2)]/40">
                             <td className="py-2.5 font-bold text-white">{srv.name}</td>
                             <td className="py-2.5 text-neutral-300">{srv.primaryPort}</td>
                             <td className="py-2.5">
@@ -1360,12 +1394,12 @@ export const AdminNodes: React.FC = () => {
                       placeholder="Add Port (e.g. 25576)"
                       value={newAllocPort}
                       onChange={e => setNewAllocPort(e.target.value)}
-                      className="px-3 py-1.5 rounded-lg bg-[#0c0d12] border border-[#23252e] text-white text-xs font-mono w-48 focus:outline-none focus:border-[#f97316]"
+                      className="px-3 py-1.5 rounded-lg bg-[var(--color-surface-0)] border border-[var(--color-line)] text-white text-xs font-mono w-48 focus:outline-none focus:border-[var(--color-accent)]"
                     />
                     <button
                       type="submit"
                       disabled={addingAlloc || !newAllocPort.trim()}
-                      className="px-3 py-1.5 rounded-lg bg-[#f97316] hover:bg-[#ea580c] text-white font-semibold text-xs cursor-pointer disabled:opacity-50 transition-all"
+                      className="px-3 py-1.5 rounded-lg bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white font-semibold text-xs cursor-pointer disabled:opacity-50 transition-all"
                     >
                       {addingAlloc ? 'Adding...' : 'Allocate Port'}
                     </button>
@@ -1379,8 +1413,8 @@ export const AdminNodes: React.FC = () => {
                         key={alloc.id}
                         className={`p-2.5 rounded-lg border text-center font-mono text-xs ${
                           alloc.isAssigned || alloc.assigned
-                            ? 'bg-[#f97316]/10 border-[#f97316]/30 text-[#f97316]'
-                            : 'bg-[#0c0d12] border-[#23252e] text-neutral-300'
+                            ? 'bg-[var(--color-accent)]/10 border-[var(--color-accent)]/30 text-[var(--color-accent)]'
+                            : 'bg-[var(--color-surface-0)] border-[var(--color-line)] text-neutral-300'
                         }`}
                       >
                         <div className="font-bold">{alloc.port}</div>
@@ -1435,14 +1469,14 @@ export const AdminNodes: React.FC = () => {
                       copyToClipboard(cfg);
                       showToast('success', 'Config copied to clipboard!');
                     }}
-                    className="flex items-center gap-1.5 px-3 py-1 rounded bg-[#0c0d12] border border-[#23252e] text-xs text-neutral-300 hover:text-white cursor-pointer"
+                    className="flex items-center gap-1.5 px-3 py-1 rounded bg-[var(--color-surface-0)] border border-[var(--color-line)] text-xs text-neutral-300 hover:text-white cursor-pointer"
                   >
                     <Copy className="w-3.5 h-3.5" />
                     <span>Copy Config</span>
                   </button>
                 </div>
 
-                <pre className="p-4 rounded-xl bg-[#0c0d12] border border-[#23252e] font-mono text-xs text-emerald-400 overflow-x-auto select-all">
+                <pre className="p-4 rounded-xl bg-[var(--color-surface-0)] border border-[var(--color-line)] font-mono text-xs text-emerald-400 overflow-x-auto select-all">
 {JSON.stringify({
   panelUrl: window.location.origin,
   nodeId: viewingNode.id,
@@ -1461,15 +1495,15 @@ export const AdminNodes: React.FC = () => {
       {/* COMPREHENSIVE NODE EDIT MODAL */}
       {editingNode && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl bg-[#14151b] border border-[#23252e] p-6 space-y-5 shadow-2xl relative animate-in fade-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between border-b border-[#23252e] pb-3">
+          <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl bg-[var(--color-surface-2)] border border-[var(--color-line)] p-6 space-y-5 shadow-2xl relative animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between border-b border-[var(--color-line)] pb-3">
               <div className="flex items-center gap-2">
-                <Edit3 className="w-5 h-5 text-[#f97316]" />
+                <Edit3 className="w-5 h-5 text-[var(--color-accent)]" />
                 <h3 className="text-base font-bold text-white">Edit Node: {editingNode.name}</h3>
               </div>
               <button
                 onClick={() => setEditingNode(null)}
-                className="p-1.5 text-neutral-400 hover:text-white rounded-lg hover:bg-[#23252e] cursor-pointer"
+                className="p-1.5 text-neutral-400 hover:text-white rounded-lg hover:bg-[var(--color-line)] cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1484,7 +1518,7 @@ export const AdminNodes: React.FC = () => {
                     required
                     value={editForm.name}
                     onChange={e => setEditForm({ ...editForm, name: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg bg-[#0c0d12] border border-[#23252e] text-white text-xs focus:outline-none focus:border-[#f97316]"
+                    className="w-full px-3 py-2 rounded-lg bg-[var(--color-surface-0)] border border-[var(--color-line)] text-white text-xs focus:outline-none focus:border-[var(--color-accent)]"
                   />
                 </div>
 
@@ -1496,7 +1530,7 @@ export const AdminNodes: React.FC = () => {
                       maxLength={2}
                       value={editForm.flagCode}
                       onChange={e => setEditForm({ ...editForm, flagCode: e.target.value.toUpperCase() })}
-                      className="w-full pl-3 pr-10 py-2 rounded-lg bg-[#0c0d12] border border-[#23252e] text-white text-xs uppercase font-mono focus:outline-none focus:border-[#f97316]"
+                      className="w-full pl-3 pr-10 py-2 rounded-lg bg-[var(--color-surface-0)] border border-[var(--color-line)] text-white text-xs uppercase font-mono focus:outline-none focus:border-[var(--color-accent)]"
                     />
                     <span className="absolute right-3 text-base">
                       {getFlagEmoji(editForm.flagCode)}
@@ -1514,7 +1548,7 @@ export const AdminNodes: React.FC = () => {
                     placeholder="localhost, 127.0.0.1, or node.znx.xyz.com"
                     value={editForm.hostname}
                     onChange={e => setEditForm({ ...editForm, hostname: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg bg-[#0c0d12] border border-[#23252e] text-white text-xs font-mono focus:outline-none focus:border-[#f97316]"
+                    className="w-full px-3 py-2 rounded-lg bg-[var(--color-surface-0)] border border-[var(--color-line)] text-white text-xs font-mono focus:outline-none focus:border-[var(--color-accent)]"
                   />
                   <span className="text-[10px] text-neutral-500 font-mono">Used by users to connect to servers</span>
                 </div>
@@ -1527,7 +1561,7 @@ export const AdminNodes: React.FC = () => {
                     placeholder="9666"
                     value={editForm.daemonPort}
                     onChange={e => setEditForm({ ...editForm, daemonPort: parseInt(e.target.value) || 9666 })}
-                    className="w-full px-3 py-2 rounded-lg bg-[#0c0d12] border border-[#23252e] text-white text-xs font-mono focus:outline-none focus:border-[#f97316]"
+                    className="w-full px-3 py-2 rounded-lg bg-[var(--color-surface-0)] border border-[var(--color-line)] text-white text-xs font-mono focus:outline-none focus:border-[var(--color-accent)]"
                   />
                   <span className="text-[10px] text-neutral-500 font-mono">Default port: 9666</span>
                 </div>
@@ -1541,7 +1575,7 @@ export const AdminNodes: React.FC = () => {
                     placeholder="e.g. play.example.com"
                     value={editForm.ipAlias}
                     onChange={e => setEditForm({ ...editForm, ipAlias: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg bg-[#0c0d12] border border-[#23252e] text-white text-xs focus:outline-none focus:border-[#f97316]"
+                    className="w-full px-3 py-2 rounded-lg bg-[var(--color-surface-0)] border border-[var(--color-line)] text-white text-xs focus:outline-none focus:border-[var(--color-accent)]"
                   />
                 </div>
 
@@ -1552,7 +1586,7 @@ export const AdminNodes: React.FC = () => {
                     placeholder="e.g. Asia, Mumbai, Germany"
                     value={editForm.location}
                     onChange={e => setEditForm({ ...editForm, location: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg bg-[#0c0d12] border border-[#23252e] text-white text-xs focus:outline-none focus:border-[#f97316]"
+                    className="w-full px-3 py-2 rounded-lg bg-[var(--color-surface-0)] border border-[var(--color-line)] text-white text-xs focus:outline-none focus:border-[var(--color-accent)]"
                   />
                 </div>
               </div>
@@ -1564,7 +1598,7 @@ export const AdminNodes: React.FC = () => {
                     type="number"
                     value={editForm.memory}
                     onChange={e => setEditForm({ ...editForm, memory: parseInt(e.target.value) || 1024 })}
-                    className="w-full px-3 py-2 rounded-lg bg-[#0c0d12] border border-[#23252e] text-white text-xs font-mono"
+                    className="w-full px-3 py-2 rounded-lg bg-[var(--color-surface-0)] border border-[var(--color-line)] text-white text-xs font-mono"
                   />
                 </div>
 
@@ -1574,7 +1608,7 @@ export const AdminNodes: React.FC = () => {
                     type="number"
                     value={editForm.disk}
                     onChange={e => setEditForm({ ...editForm, disk: parseInt(e.target.value) || 1024 })}
-                    className="w-full px-3 py-2 rounded-lg bg-[#0c0d12] border border-[#23252e] text-white text-xs font-mono"
+                    className="w-full px-3 py-2 rounded-lg bg-[var(--color-surface-0)] border border-[var(--color-line)] text-white text-xs font-mono"
                   />
                 </div>
 
@@ -1584,7 +1618,7 @@ export const AdminNodes: React.FC = () => {
                     type="number"
                     value={editForm.cpu}
                     onChange={e => setEditForm({ ...editForm, cpu: parseInt(e.target.value) || 100 })}
-                    className="w-full px-3 py-2 rounded-lg bg-[#0c0d12] border border-[#23252e] text-white text-xs font-mono"
+                    className="w-full px-3 py-2 rounded-lg bg-[var(--color-surface-0)] border border-[var(--color-line)] text-white text-xs font-mono"
                   />
                 </div>
 
@@ -1594,13 +1628,13 @@ export const AdminNodes: React.FC = () => {
                     type="number"
                     value={editForm.maxServers}
                     onChange={e => setEditForm({ ...editForm, maxServers: parseInt(e.target.value) || 10 })}
-                    className="w-full px-3 py-2 rounded-lg bg-[#0c0d12] border border-[#23252e] text-white text-xs font-mono"
+                    className="w-full px-3 py-2 rounded-lg bg-[var(--color-surface-0)] border border-[var(--color-line)] text-white text-xs font-mono"
                   />
                 </div>
               </div>
 
               {/* Maintenance Mode Toggle */}
-              <div className="p-3 rounded-lg bg-[#0c0d12] border border-[#23252e] flex items-center justify-between">
+              <div className="p-3 rounded-lg bg-[var(--color-surface-0)] border border-[var(--color-line)] flex items-center justify-between">
                 <div>
                   <div className="text-xs font-bold text-white">Maintenance Mode</div>
                   <div className="text-[11px] text-neutral-400">
@@ -1614,22 +1648,22 @@ export const AdminNodes: React.FC = () => {
                     onChange={e => setEditForm({ ...editForm, maintenanceMode: e.target.checked })}
                     className="sr-only peer"
                   />
-                  <div className="w-9 h-5 bg-neutral-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-neutral-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#f97316]"></div>
+                  <div className="w-9 h-5 bg-neutral-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-[var(--border-3)] after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-[var(--border-1)] after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[var(--color-accent)]"></div>
                 </label>
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#23252e]">
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-[var(--color-line)]">
                 <button
                   type="button"
                   onClick={() => setEditingNode(null)}
-                  className="px-4 py-2 rounded-lg bg-[#0c0d12] border border-[#23252e] text-neutral-300 text-xs font-medium hover:text-white cursor-pointer"
+                  className="px-4 py-2 rounded-lg bg-[var(--color-surface-0)] border border-[var(--color-line)] text-neutral-300 text-xs font-medium hover:text-white cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={savingEdit}
-                  className="px-6 py-2 rounded-lg bg-[#f97316] hover:bg-[#ea580c] text-white font-semibold text-xs cursor-pointer disabled:opacity-50 transition-all shadow-md shadow-[#f97316]/20"
+                  className="px-6 py-2 rounded-lg bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white font-semibold text-xs cursor-pointer disabled:opacity-50 transition-all shadow-md shadow-[var(--color-accent)]/20"
                 >
                   {savingEdit ? 'Saving Changes...' : 'Save Changes'}
                 </button>

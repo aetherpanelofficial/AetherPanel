@@ -418,7 +418,7 @@ export const ServerSubusersTab: React.FC<ServerSubusersTabProps> = ({ server }) 
                 className="btn btn-primary"
               >
                 {isSubmitting ? (
-                  <div className="h-3.5 w-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <div className="h-3.5 w-3.5 border-2 border-[var(--border-1)] border-t-[var(--color-accent)] rounded-full animate-spin" />
                 ) : showEditModal ? (
                   <>
                     <Save className="h-3.5 w-3.5" />

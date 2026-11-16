@@ -6,6 +6,7 @@ import {
   HelpCircle, AlertCircle, Users, Radio, HardDrive, FileCode, Plus, Trash2, Star, Edit2
 } from 'lucide-react';
 import { apiRequest } from '../../lib/api';
+import { useToast } from '../../lib/ToastContext';
 import { Server as ServerType, SftpConnectionInfo, Allocation, SftpActiveSessionDTO } from '../../types';
 
 interface ServerNetworkTabProps {
@@ -28,6 +29,7 @@ interface ServerNetworkData {
 }
 
 export const ServerNetworkTab: React.FC<ServerNetworkTabProps> = ({ server, onRefreshServer }) => {
+  const { toast } = useToast();
   const [networkData, setNetworkData] = useState<ServerNetworkData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -100,9 +102,12 @@ export const ServerNetworkTab: React.FC<ServerNetworkTabProps> = ({ server, onRe
       if (res.success) {
         await fetchNetworkData();
         onRefreshServer();
+        toast.success('Primary allocation updated.');
       } else {
-        alert(res.error?.message || 'Failed to set primary allocation.');
+        toast.retry('error', res.error?.message || 'Failed to set primary allocation.', () => handleSetPrimary(allocId), 'Allocation update failed');
       }
+    } catch (error) {
+      toast.retry('error', error instanceof Error ? error.message : 'Failed to set primary allocation.', () => handleSetPrimary(allocId), 'Allocation update failed');
     } finally {
       setActionLoadingId(null);
     }
@@ -124,9 +129,12 @@ export const ServerNetworkTab: React.FC<ServerNetworkTabProps> = ({ server, onRe
         setAllocNotesInput('');
         await fetchNetworkData();
         onRefreshServer();
+        toast.success('Port allocation added.');
       } else {
-        alert(res.error?.message || 'Failed to assign allocation.');
+        toast.retry('error', res.error?.message || 'Failed to assign allocation.', handleAssignAllocation, 'Port allocation failed');
       }
+    } catch (error) {
+      toast.retry('error', error instanceof Error ? error.message : 'Failed to assign allocation.', handleAssignAllocation, 'Port allocation failed');
     } finally {
       setAssigningPort(false);
     }
@@ -142,9 +150,12 @@ export const ServerNetworkTab: React.FC<ServerNetworkTabProps> = ({ server, onRe
       if (res.success) {
         await fetchNetworkData();
         onRefreshServer();
+        toast.success(`Port ${port} released.`);
       } else {
-        alert(res.error?.message || 'Failed to release allocation.');
+        toast.retry('error', res.error?.message || 'Failed to release allocation.', () => handleDeleteAllocation(allocId, port), 'Port release failed');
       }
+    } catch (error) {
+      toast.retry('error', error instanceof Error ? error.message : 'Failed to release allocation.', () => handleDeleteAllocation(allocId, port), 'Port release failed');
     } finally {
       setActionLoadingId(null);
     }
@@ -160,7 +171,12 @@ export const ServerNetworkTab: React.FC<ServerNetworkTabProps> = ({ server, onRe
       if (res.success) {
         setEditingAllocId(null);
         await fetchNetworkData();
+        toast.success('Allocation notes saved.');
+      } else {
+        toast.retry('error', res.error?.message || 'Failed to save allocation notes.', () => handleSaveNotes(allocId), 'Save failed');
       }
+    } catch (error) {
+      toast.retry('error', error instanceof Error ? error.message : 'Failed to save allocation notes.', () => handleSaveNotes(allocId), 'Save failed');
     } finally {
       setActionLoadingId(null);
     }
@@ -173,7 +189,12 @@ export const ServerNetworkTab: React.FC<ServerNetworkTabProps> = ({ server, onRe
       const res = await apiRequest(`/servers/${server.id}/sftp/sessions/${sessionId}`, { method: 'DELETE' });
       if (res.success) {
         await fetchSftpInfo();
+        toast.success('SFTP session disconnected.');
+      } else {
+        toast.retry('error', res.error?.message || 'Failed to disconnect SFTP session.', () => handleTerminateSession(sessionId), 'Disconnect failed');
       }
+    } catch (error) {
+      toast.retry('error', error instanceof Error ? error.message : 'Failed to disconnect SFTP session.', () => handleTerminateSession(sessionId), 'Disconnect failed');
     } finally {
       setTerminatingSessionId(null);
     }
@@ -192,7 +213,7 @@ export const ServerNetworkTab: React.FC<ServerNetworkTabProps> = ({ server, onRe
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
-              <span className="px-2 py-0.5 rounded text-[10px] font-mono font-medium uppercase tracking-wider bg-[var(--color-ok)]/10 text-[var(--color-ok)] border border-[var(--color-ok)]/40">
+              <span className="badge badge-success">
                 Pterodactyl Node Allocation
               </span>
               <span className="text-xs text-[var(--color-ink-mute)] font-medium flex items-center gap-1 font-mono">
@@ -217,6 +238,7 @@ export const ServerNetworkTab: React.FC<ServerNetworkTabProps> = ({ server, onRe
                 onClick={() => copyToClipboard(primaryEndpoint, 'primary_endpoint')}
                 className="p-1 rounded hover:bg-[var(--color-surface-3)] text-[var(--color-ink-mute)] hover:text-[var(--color-ink)] transition-colors cursor-pointer"
                 title="Copy Connection Address"
+                aria-label="Copy connection address"
               >
                 {copiedKey === 'primary_endpoint' ? (
                   <Check className="h-3.5 w-3.5 text-[var(--color-ok)]" />
@@ -258,6 +280,7 @@ export const ServerNetworkTab: React.FC<ServerNetworkTabProps> = ({ server, onRe
             disabled={loading}
             className="p-1.5 rounded-md bg-[var(--color-surface-2)] hover:bg-[var(--color-surface-3)] text-[var(--color-ink-mute)] hover:text-[var(--color-ink)] border border-[var(--color-line)] transition-colors cursor-pointer"
             title="Refresh Allocations"
+            aria-label="Refresh port allocations"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
           </button>
@@ -291,7 +314,7 @@ export const ServerNetworkTab: React.FC<ServerNetworkTabProps> = ({ server, onRe
                           {alloc.ip}:{alloc.port}
                         </span>
                         {isPrimary && (
-                          <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-medium uppercase tracking-wider bg-[var(--color-accent)]/10 text-[var(--color-accent)] border border-[var(--color-accent)]/30 flex items-center gap-1">
+                          <span className="badge badge-accent">
                             <Star className="h-2.5 w-2.5 fill-current" />
                             Primary
                           </span>
@@ -336,6 +359,7 @@ export const ServerNetworkTab: React.FC<ServerNetworkTabProps> = ({ server, onRe
                             }}
                             className="p-0.5 text-[var(--color-ink-mute)] hover:text-[var(--color-ink)] transition-colors cursor-pointer"
                             title="Edit Notes"
+                            aria-label={`Edit notes for port ${alloc.port}`}
                           >
                             <Edit2 className="h-3 w-3" />
                           </button>
@@ -374,6 +398,7 @@ export const ServerNetworkTab: React.FC<ServerNetworkTabProps> = ({ server, onRe
                           disabled={actionLoadingId === alloc.id}
                           className="btn btn-danger text-xs p-1.5"
                           title="Remove Allocation"
+                          aria-label={`Remove port ${alloc.port}`}
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>
@@ -402,7 +427,7 @@ export const ServerNetworkTab: React.FC<ServerNetworkTabProps> = ({ server, onRe
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <span className="px-2 py-0.5 rounded text-[10px] font-mono font-medium uppercase bg-[var(--color-ok)]/10 text-[var(--color-ok)] border border-[var(--color-ok)]/40">
+            <span className="badge badge-success">
               Port 2022 Active
             </span>
           </div>
@@ -419,6 +444,7 @@ export const ServerNetworkTab: React.FC<ServerNetworkTabProps> = ({ server, onRe
                   type="button"
                   onClick={() => copyToClipboard(sftpInfo?.host || primaryHost, 'sftp_host')}
                   className="p-1 hover:text-[var(--color-accent)] transition-colors cursor-pointer text-[var(--color-ink-mute)]"
+                  aria-label="Copy SFTP hostname"
                 >
                   {copiedKey === 'sftp_host' ? <Check className="h-3 w-3 text-[var(--color-ok)]" /> : <Copy className="h-3 w-3" />}
                 </button>
@@ -434,6 +460,7 @@ export const ServerNetworkTab: React.FC<ServerNetworkTabProps> = ({ server, onRe
                   type="button"
                   onClick={() => copyToClipboard(String(sftpInfo?.port || 2022), 'sftp_port')}
                   className="p-1 hover:text-[var(--color-accent)] transition-colors cursor-pointer text-[var(--color-ink-mute)]"
+                  aria-label="Copy SFTP port"
                 >
                   {copiedKey === 'sftp_port' ? <Check className="h-3 w-3 text-[var(--color-ok)]" /> : <Copy className="h-3 w-3" />}
                 </button>
@@ -449,6 +476,7 @@ export const ServerNetworkTab: React.FC<ServerNetworkTabProps> = ({ server, onRe
                   type="button"
                   onClick={() => copyToClipboard(sftpInfo?.username || `admin.${server.id.substring(0, 8)}`, 'sftp_user')}
                   className="p-1 hover:text-[var(--color-accent)] transition-colors cursor-pointer text-[var(--color-ink-mute)]"
+                  aria-label="Copy SFTP username"
                 >
                   {copiedKey === 'sftp_user' ? <Check className="h-3 w-3 text-[var(--color-ok)]" /> : <Copy className="h-3 w-3" />}
                 </button>
