@@ -20,8 +20,6 @@ export async function ensureLocalNode(): Promise<Node> {
   const freeRamMB = Math.round(os.freemem() / (1024 * 1024));
   const usedRamMB = Math.max(0, hostRamMB - freeRamMB);
   const hostCpuCores = os.cpus()?.length || 4;
-  const hostName = os.hostname() || 'local-vps';
-
   // Calculate approximate disk capacity
   let totalDiskGB = 200;
   let usedDiskGB = 10;
@@ -83,7 +81,7 @@ export async function ensureLocalNode(): Promise<Node> {
       lastProbeAt: new Date().toISOString(),
       lastSuccessfulProbeAt: new Date().toISOString(),
       ip: primaryIp,
-      fqdn: process.env.NODE_FQDN || process.env.LOCAL_NODE_FQDN || (hostName.includes('.') ? hostName : `${hostName}.local`),
+      fqdn: process.env.NODE_FQDN || process.env.LOCAL_NODE_FQDN || undefined,
       sftpPort: 2022,
       lastHeartbeatAt: new Date().toISOString(),
       createdAt: new Date().toISOString()
@@ -122,7 +120,9 @@ export async function ensureLocalNode(): Promise<Node> {
     localNode.apiUrl = `${localNode.ssl ? 'https' : 'http'}://${localNode.hostname || 'localhost'}:${localNode.apiPort}`;
   }
   localNode.sftpPort = localNode.sftpPort || 2022;
-  if (!localNode.fqdn) localNode.fqdn = hostName.includes('.') ? hostName : `${hostName}.local`;
+  if (!localNode.fqdn && (process.env.NODE_FQDN || process.env.LOCAL_NODE_FQDN)) {
+    localNode.fqdn = process.env.NODE_FQDN || process.env.LOCAL_NODE_FQDN;
+  }
   if (detectedPublicIp && (!localNode.publicIpv4 || localNode.ip === '127.0.0.1')) {
     localNode.publicIpv4 = detectedPublicIp;
   }

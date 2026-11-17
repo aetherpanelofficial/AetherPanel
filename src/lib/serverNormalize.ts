@@ -57,6 +57,15 @@ export function normalizeServer(apiServer: any): Server {
     databases: apiServer.limits?.databases ?? 1
   };
 
+  const endpointSource: Server['endpointSource'] =
+    apiServer.endpointSource === 'fqdn' ||
+    apiServer.endpointSource === 'hostname' ||
+    apiServer.endpointSource === 'public_ipv4' ||
+    apiServer.endpointSource === 'public_ipv6' ||
+    apiServer.endpointSource === 'node_ip'
+      ? apiServer.endpointSource
+      : undefined;
+
   return {
     id: String(apiServer.id || ''),
     installationId: apiServer.installationId,
@@ -77,6 +86,8 @@ export function normalizeServer(apiServer: any): Server {
     status: apiServer.status || 'offline',
     primaryIp: String(apiServer.primaryIp || '127.0.0.1'),
     primaryPort: Number(apiServer.primaryPort || 25565),
+    resolvedPublicEndpoint: typeof apiServer.resolvedPublicEndpoint === 'string' ? apiServer.resolvedPublicEndpoint : undefined,
+    endpointSource,
     location: String(apiServer.location || 'us-east'),
     software: String(apiServer.software || (isMinecraft ? 'Paper' : 'Node.js')),
     version: String(apiServer.version || (isMinecraft ? '1.20.4' : 'Node 20')),

@@ -219,7 +219,7 @@ export const AdminProducts: React.FC = () => {
       {loading ? (
         <div className="p-12 text-center text-xs text-zinc-400">Loading plan specifications...</div>
       ) : filteredPlans.length === 0 ? (
-        <div className="p-12 text-center bg-zinc-900/60 border border-zinc-800 rounded-3xl text-zinc-400 text-xs space-y-2">
+        <div className="p-12 text-center bg-zinc-900/60 border border-zinc-800 rounded-2xl text-zinc-400 text-xs space-y-2">
           <Package className="h-8 w-8 text-zinc-600 mx-auto" />
           <p>No plan specifications configured for this category.</p>
         </div>
@@ -229,7 +229,7 @@ export const AdminProducts: React.FC = () => {
             const prod = products.find(pr => pr.id === p.productId);
 
             return (
-              <div key={p.id} className="p-5 rounded-3xl bg-zinc-900 border border-zinc-800 space-y-4 relative flex flex-col justify-between hover:border-zinc-700 transition-all">
+              <div key={p.id} className="p-5 rounded-2xl bg-zinc-900 border border-zinc-800 space-y-4 relative flex flex-col justify-between hover:border-zinc-700 transition-all">
                 <div>
                   <div className="flex justify-between items-start mb-2">
                     <div>

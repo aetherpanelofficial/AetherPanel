@@ -227,7 +227,7 @@ function AppContent() {
           <GlobalBackground isPanel={true} />
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[350px] h-[350px] bg-amber-500/5 rounded-full blur-[120px] pointer-events-none" />
           
-          <div className="max-w-md w-full bg-zinc-900/40 border border-zinc-800/80 p-8 rounded-3xl backdrop-blur-md text-center space-y-6 relative shadow-2xl">
+          <div className="max-w-md w-full bg-zinc-900/40 border border-zinc-800/80 p-8 rounded-2xl backdrop-blur-md text-center space-y-6 relative shadow-2xl">
             <div className="h-16 w-16 mx-auto rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center animate-pulse">
               <ShieldAlert className="h-8 w-8 text-amber-500" />
             </div>

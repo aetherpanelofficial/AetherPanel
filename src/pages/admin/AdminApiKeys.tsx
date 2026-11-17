@@ -619,7 +619,7 @@ export const AdminApiKeys: React.FC<AdminApiKeysProps> = () => {
 
       {/* TAB 2: AUDIT TRAIL VIEW */}
       {activeTab === 'audit' && (
-        <div className="p-6 rounded-3xl bg-zinc-900 border border-zinc-800 space-y-4">
+        <div className="p-6 rounded-2xl bg-zinc-900 border border-zinc-800 space-y-4">
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-base font-bold text-white flex items-center gap-2">
@@ -685,7 +685,7 @@ export const AdminApiKeys: React.FC<AdminApiKeysProps> = () => {
 
       {/* TAB 3: SECURITY ACCEPTANCE TESTS */}
       {activeTab === 'tests' && (
-        <div className="p-6 rounded-3xl bg-zinc-900 border border-zinc-800 space-y-6">
+        <div className="p-6 rounded-2xl bg-zinc-900 border border-zinc-800 space-y-6">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
               <h3 className="text-base font-bold text-white flex items-center gap-2">

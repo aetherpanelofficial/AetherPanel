@@ -69,7 +69,7 @@ export const AdminAnnouncements: React.FC = () => {
       ) : (
         <div className="space-y-4">
           {announcements.map((a) => (
-            <div key={a.id} className="p-5 rounded-3xl bg-zinc-900 border border-zinc-800 space-y-2 flex justify-between items-start">
+            <div key={a.id} className="p-5 rounded-2xl bg-zinc-900 border border-zinc-800 space-y-2 flex justify-between items-start">
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
                   <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-mono capitalize border ${

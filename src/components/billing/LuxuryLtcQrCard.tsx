@@ -78,7 +78,7 @@ export const LuxuryLtcQrCard: React.FC<LuxuryLtcQrCardProps> = ({
   };
 
   return (
-    <div className="p-6 rounded-3xl bg-gradient-to-b from-zinc-950 via-zinc-900 to-zinc-950 border border-amber-500/30 shadow-[0_0_30px_rgba(245,158,11,0.12)] space-y-6 relative overflow-hidden text-zinc-100">
+    <div className="p-6 rounded-2xl bg-gradient-to-b from-zinc-950 via-zinc-900 to-zinc-950 border border-amber-500/30 shadow-[0_0_30px_rgba(245,158,11,0.12)] space-y-6 relative overflow-hidden text-zinc-100">
       {/* Metallic Gold Top Accent Border */}
       <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-600 shadow-[0_0_15px_rgba(245,158,11,0.5)]" />
 

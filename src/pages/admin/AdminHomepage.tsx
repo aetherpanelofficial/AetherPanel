@@ -37,8 +37,8 @@ export const AdminHomepage: React.FC<AdminHomepageProps> = ({ onNavigate }) => {
 
   const [heroBackgroundImagesText, setHeroBackgroundImagesText] = useState<string>(
     (homepageConfig.heroBackgroundImages || [
-      '/src/assets/images/hero_minecraft_landscape_1791889746896.jpg',
-      '/src/assets/images/hero_datacenter_servers_1791889746971.jpg'
+      '/images/hero-bot-hosting.jpg',
+      '/images/hero-minecraft-steve.png'
     ]).join('\n')
   );
   const [heroSlideDelaySeconds, setHeroSlideDelaySeconds] = useState<number>(
@@ -603,11 +603,11 @@ export const AdminHomepage: React.FC<AdminHomepageProps> = ({ onNavigate }) => {
                   rows={4}
                   value={heroBackgroundImagesText}
                   onChange={(e) => setHeroBackgroundImagesText(e.target.value)}
-                  placeholder="/src/assets/images/hero_minecraft_landscape_1791889746896.jpg&#10;/src/assets/images/hero_datacenter_servers_1791889746971.jpg"
+                  placeholder="/images/hero-bot-hosting.jpg&#10;/images/hero-minecraft-steve.png"
                   className="w-full p-3 rounded-xl bg-zinc-950 border border-zinc-800 text-xs text-white focus:outline-none focus:border-amber-500 font-mono resize-y leading-relaxed"
                 />
                 <p className="text-[11px] text-zinc-500">
-                  Enter local paths (e.g. <code className="text-zinc-400">/src/assets/images/...</code>) or hosted HTTPS image URLs.
+                  Enter public paths (e.g. <code className="text-zinc-400">/images/hero-bot-hosting.jpg</code>) or hosted HTTPS image URLs.
                 </p>
               </div>
 

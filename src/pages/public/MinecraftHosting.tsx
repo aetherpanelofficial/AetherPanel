@@ -92,7 +92,7 @@ export const MinecraftHosting: React.FC<MinecraftHostingProps> = ({ onNavigate }
           <button
             type="button"
             onClick={() => setBillingCycle(billingCycle === 'monthly' ? 'yearly' : 'monthly')}
-            className="w-12 h-6 rounded-full bg-[#14151b] border border-[#23252e] p-0.5 flex items-center cursor-pointer transition-colors hover:border-[#f97316]/50"
+            className="toggle-switch w-12 h-6 bg-[#14151b] border border-[#23252e] p-0.5 flex items-center cursor-pointer transition-colors hover:border-[#f97316]/50"
           >
             <div className={`h-4.5 w-4.5 rounded-full bg-[#f97316] shadow-md transition-transform ${billingCycle === 'yearly' ? 'translate-x-6' : 'translate-x-0'}`} />
           </button>

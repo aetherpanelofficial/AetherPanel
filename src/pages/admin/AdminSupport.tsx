@@ -78,7 +78,7 @@ export const AdminSupport: React.FC = () => {
         {/* Selected Thread */}
         <div className="lg:col-span-2">
           {selectedTicket ? (
-            <div className="p-6 rounded-3xl bg-zinc-900 border border-zinc-800 space-y-6">
+            <div className="p-6 rounded-2xl bg-zinc-900 border border-zinc-800 space-y-6">
               <div className="flex justify-between items-start border-b border-zinc-800 pb-4">
                 <div>
                   <h2 className="text-lg font-bold text-white">{selectedTicket.subject}</h2>
@@ -118,7 +118,7 @@ export const AdminSupport: React.FC = () => {
               </form>
             </div>
           ) : (
-            <div className="p-12 text-center bg-zinc-900/60 border border-zinc-800 rounded-3xl text-zinc-400 text-xs">
+            <div className="p-12 text-center bg-zinc-900/60 border border-zinc-800 rounded-2xl text-zinc-400 text-xs">
               Select a support ticket to respond.
             </div>
           )}

@@ -1323,6 +1323,7 @@ export const ServerManage: React.FC<ServerManageProps> = ({ serverId, initialTab
           server={server}
           isMinecraft={isMinecraft}
           isPython={isPython}
+          endpointSource={server.endpointSource}
           fullIp={fullIp}
           copied={copied}
           onCopy={handleCopy}

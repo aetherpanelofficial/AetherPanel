@@ -789,7 +789,7 @@ export const ServerFileManagerTab: React.FC<ServerFileManagerTabProps> = ({ serv
     >
       {/* Visual Drop Overlay */}
       {isDragOver && (
-        <div className="absolute inset-0 z-40 bg-amber-500/15 backdrop-blur-xs border-2 border-dashed border-amber-400 rounded-3xl flex flex-col items-center justify-center pointer-events-none p-6 animate-in fade-in">
+        <div className="absolute inset-0 z-40 bg-amber-500/15 backdrop-blur-xs border-2 border-dashed border-amber-400 rounded-2xl flex flex-col items-center justify-center pointer-events-none p-6 animate-in fade-in">
           <Upload className="h-12 w-12 text-amber-400 animate-bounce mb-2" />
           <h3 className="text-lg font-bold text-white">Drop files here to upload</h3>
           <p className="text-xs text-amber-200 mt-1">Files will be uploaded directly into {currentPath}</p>

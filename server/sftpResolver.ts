@@ -1,14 +1,26 @@
+import os from 'os';
 import { Node, Server, SftpConnectionInfo } from '../src/types';
 import { getDb } from './db';
 import { checkPortReachable } from './network/networkDetection';
+import { isValidFQDN } from './network/endpointResolver';
 
 export interface SftpResolutionDetails {
   mode: 'DIRECT' | 'direct';
   status: 'online' | 'offline';
   host: string;
   port: number;
-  source: 'fqdn' | 'public_ipv4' | 'node_ip' | 'host_header';
+  source: 'fqdn' | 'hostname' | 'public_ipv4' | 'node_ip' | 'host_header';
   reachable: boolean;
+}
+
+function resolveSftpHost(node?: Partial<Node> | null, hostHeader?: string): { host: string; source: SftpResolutionDetails['source'] } {
+  const fqdn = node?.fqdn?.trim();
+  if (isValidFQDN(fqdn)) return { host: fqdn, source: 'fqdn' };
+  if (node?.isLocal || node?.isLocalNode) return { host: os.hostname(), source: 'hostname' };
+  if (node?.publicIpv4?.trim()) return { host: node.publicIpv4.trim(), source: 'public_ipv4' };
+  if (hostHeader && hostHeader !== 'localhost') return { host: hostHeader, source: 'host_header' };
+  const nodeIp = node?.ip?.trim() || node?.hostname?.trim();
+  return { host: nodeIp || '127.0.0.1', source: 'node_ip' };
 }
 
 /**
@@ -21,16 +33,7 @@ export async function resolveNodeSftpMode(nodeId: string): Promise<SftpResolutio
   const sftpPort = node?.sftpPort || 2022;
   const sftpDaemonOnline = await checkPortReachable('127.0.0.1', sftpPort, 1000);
 
-  let host = node?.fqdn || node?.publicIpv4 || node?.ip || node?.hostname || '127.0.0.1';
-  let source: SftpResolutionDetails['source'] = 'node_ip';
-
-  if (node?.fqdn) {
-    host = node.fqdn.trim();
-    source = 'fqdn';
-  } else if (node?.publicIpv4) {
-    host = node.publicIpv4.trim();
-    source = 'public_ipv4';
-  }
+  const { host, source } = resolveSftpHost(node);
 
   return {
     mode: 'DIRECT',
@@ -44,7 +47,7 @@ export async function resolveNodeSftpMode(nodeId: string): Promise<SftpResolutio
 
 /**
  * Resolves the SFTP endpoint for any server using standard Pterodactyl node conventions.
- * Uses the Node's FQDN or Public IP, SFTP port (2022), and user.serverId credentials.
+ * Uses a valid node FQDN or its local hostname fallback, the SFTP port, and user.serverId credentials.
  */
 export async function resolveServerSftpInfo(
   serverId: string,
@@ -68,7 +71,7 @@ export async function resolveServerSftpInfo(
 
   const cleanHeader = clientHostHeader ? clientHostHeader.split(':')[0].trim() : '';
 
-  let host = node?.fqdn || node?.publicIpv4 || (cleanHeader && cleanHeader !== 'localhost' ? cleanHeader : (node?.ip || 'localhost'));
+  const { host } = resolveSftpHost(node, cleanHeader);
   let port = node?.sftpPort || 2022;
 
   const uri = `sftp://${sftpUsername}@${host}:${port}`;

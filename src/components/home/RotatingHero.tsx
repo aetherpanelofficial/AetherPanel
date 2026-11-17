@@ -44,7 +44,7 @@ export const DEFAULT_HERO_SLIDES: HeroSlide[] = [
     secondaryCtaText: 'View Plans',
     secondaryCtaTarget: '#pricing',
     bgGradient: 'from-orange-950/40 via-[#0a0a0b]/80 to-[#0a0a0b]',
-    bgImage: '/assets/aistudio/bot-C5zW-1NS_d57d6927.png',
+    bgImage: '/images/hero-bot-hosting.jpg',
     accentColor: '#FF6A00',
     badge: '99.99% Uptime'
   },
@@ -65,7 +65,7 @@ export const DEFAULT_HERO_SLIDES: HeroSlide[] = [
     secondaryCtaText: 'View Plans',
     secondaryCtaTarget: '#pricing',
     bgGradient: 'from-blue-950/40 via-[#0a0a0b]/80 to-[#0a0a0b]',
-    bgImage: '/assets/aistudio/photo-1760114333175-0143a2a446da_3849eca9.png',
+    bgImage: '/images/hero-minecraft-steve.png',
     accentColor: '#FF6A00',
     badge: 'Ryzen 9 7950X'
   }
@@ -183,42 +183,37 @@ export const RotatingHero: React.FC<RotatingHeroProps> = ({
       {/* ─────────────────────────────────────────────────────────────────────────────
           1. SLIDE BACKGROUND IMAGES (ORPHOST STYLE: VIVID RIGHT-ALIGNED ARTWORK)
       ───────────────────────────────────────────────────────────────────────────── */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden -z-0">
+      <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
         {slides.map((s, idx) => {
           const isActive = idx === currentIndex;
           return (
             <div
               key={s.id}
-              className={`absolute inset-0 transition-opacity duration-700 ease-out ${
-                isActive ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+              className={`absolute inset-0 z-0 pointer-events-none transition-opacity duration-1000 ease-out ${
+                isActive ? 'opacity-100' : 'opacity-0'
               }`}
-              style={{ willChange: 'transform, opacity' }}
+              style={{ willChange: 'opacity' }}
             >
               {s.bgImage ? (
-                <div className="absolute right-0 top-0 bottom-0 w-full md:w-[65%] lg:w-[60%] flex items-center justify-end overflow-hidden">
-                  {/* High-fidelity Artwork */}
+                <div className="absolute inset-y-0 right-0 z-0 w-full overflow-hidden md:w-[65%] lg:w-[60%]">
                   <img
                     src={s.bgImage}
                     alt={s.titlePrefix}
                     fetchPriority={idx === 0 ? 'high' : 'auto'}
                     decoding="async"
-                    className={`w-full h-full object-contain md:object-cover object-center md:object-right transition-transform duration-[7000ms] ease-out ${
-                      isActive ? 'scale-105' : 'scale-100'
+                    className={`h-full w-full ${
+                      s.category === 'minecraft'
+                        ? 'object-cover object-[54%_center]'
+                        : 'object-contain object-center md:object-right'
                     }`}
                   />
-                  {/* Left-edge smooth fade into solid background */}
-                  <div className="absolute inset-y-0 left-0 w-36 sm:w-64 md:w-80 bg-gradient-to-r from-[#0a0a0b] via-[#0a0a0b]/80 to-transparent" />
-                  {/* Bottom edge soft blend */}
-                  <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-[#0a0a0b] via-[#0a0a0b]/60 to-transparent" />
-                  {/* Top edge soft blend */}
-                  <div className="absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-[#0a0a0b] to-transparent" />
+                  <div className="absolute inset-y-0 left-0 z-10 w-36 sm:w-64 md:w-80 bg-gradient-to-r from-[#0a0a0b] via-[#0a0a0b]/80 to-transparent" />
+                  <div className="absolute inset-x-0 bottom-0 z-10 h-28 bg-gradient-to-t from-[#0a0a0b] via-[#0a0a0b]/60 to-transparent" />
+                  <div className="absolute inset-x-0 top-0 z-10 h-20 bg-gradient-to-b from-[#0a0a0b] to-transparent" />
                 </div>
               ) : (
                 <div className={`absolute inset-0 bg-gradient-to-br ${s.bgGradient}`} />
               )}
-
-              {/* Left Side Content Solid Backing */}
-              <div className="absolute inset-y-0 left-0 w-full md:w-[50%] bg-[#0a0a0b] -z-10" />
             </div>
           );
         })}

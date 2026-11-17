@@ -255,6 +255,8 @@ export interface Server {
   status: ServerStatus;
   primaryIp: string;
   primaryPort: number;
+  resolvedPublicEndpoint?: string;
+  endpointSource?: 'fqdn' | 'hostname' | 'public_ipv4' | 'public_ipv6' | 'node_ip';
   additionalPorts?: number[];
   location: string;
   software: string; // e.g., 'Paper', 'Purpur', 'Spigot', 'Node.js', 'Python'

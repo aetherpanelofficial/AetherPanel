@@ -155,15 +155,20 @@ export const ServerCard: React.FC<ServerCardProps> = ({ server, onNavigate, onPo
         <div className="flex items-center justify-between text-xs gap-2">
           <button
             onClick={handleCopyIp}
-            title="Click to copy endpoint IP"
+            title={`Click to copy endpoint. ${server.endpointSource === 'fqdn' ? 'Configured FQDN' : server.endpointSource === 'hostname' ? 'OS hostname fallback' : 'Address fallback'}.`}
             className="flex items-center gap-1.5 px-2 py-1 rounded bg-[var(--color-surface-2)] border border-[var(--color-line)] font-mono text-[10px] text-[var(--color-ink-dim)] hover:text-[var(--color-ink)] hover:border-[#2e3034] transition-colors truncate max-w-[75%] cursor-pointer"
           >
             <span className="truncate">{fullIp}</span>
             {copied ? <Check className="h-3 w-3 text-[var(--color-ok)] shrink-0" /> : <Copy className="h-3 w-3 text-[var(--color-ink-mute)] shrink-0" />}
           </button>
 
-          <span className="text-[9px] font-mono tracking-wider text-[var(--color-ink-mute)] bg-[var(--color-surface-2)] px-1.5 py-0.5 rounded border border-[var(--color-line)] shrink-0 uppercase">
-            {server.location || 'node-01'}
+          <span className="flex flex-col items-end gap-0.5 shrink-0">
+            <span className="text-[9px] font-mono tracking-wider text-[var(--color-ink-mute)] bg-[var(--color-surface-2)] px-1.5 py-0.5 rounded border border-[var(--color-line)] uppercase">
+              {server.location || 'node-01'}
+            </span>
+            <span className="text-[11px] font-mono uppercase tracking-[0.06em] text-[var(--color-ink-mute)]">
+              {server.endpointSource === 'fqdn' ? 'Configured FQDN' : server.endpointSource === 'hostname' ? 'OS hostname fallback' : 'Address fallback'}
+            </span>
           </span>
         </div>
 

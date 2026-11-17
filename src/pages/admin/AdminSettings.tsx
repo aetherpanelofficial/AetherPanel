@@ -737,7 +737,7 @@ export const AdminSettings: React.FC = () => {
 
       {/* TAB 1: General Settings */}
       {activeTab === 'general' && (
-        <form onSubmit={handleSaveGeneral} className="p-6 rounded-3xl bg-zinc-900 border border-zinc-800 space-y-5">
+        <form onSubmit={handleSaveGeneral} className="p-6 rounded-2xl bg-zinc-900 border border-zinc-800 space-y-5">
           <h2 className="text-base font-bold text-white border-b border-zinc-800 pb-3">Branding & System Toggles</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
@@ -1020,7 +1020,7 @@ export const AdminSettings: React.FC = () => {
 
       {/* TAB: Authentication Providers */}
       {activeTab === 'auth' && (
-        <form onSubmit={handleSaveAuthProviders} className="p-6 rounded-3xl bg-zinc-900 border border-zinc-800 space-y-6">
+        <form onSubmit={handleSaveAuthProviders} className="p-6 rounded-2xl bg-zinc-900 border border-zinc-800 space-y-6">
           <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
             <div>
               <h2 className="text-base font-bold text-white">Authentication Providers & Social Logins</h2>
@@ -1306,7 +1306,7 @@ export const AdminSettings: React.FC = () => {
 
       {/* TAB: Security & Anti-Abuse */}
       {activeTab === 'security' && (
-        <form onSubmit={handleSaveAntiAbuse} className="p-6 rounded-3xl bg-zinc-900 border border-zinc-800 space-y-6">
+        <form onSubmit={handleSaveAntiAbuse} className="p-6 rounded-2xl bg-zinc-900 border border-zinc-800 space-y-6">
           <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
             <div>
               <h2 className="text-base font-bold text-white flex items-center gap-2">
@@ -1500,7 +1500,7 @@ export const AdminSettings: React.FC = () => {
 
       {/* TAB 2: Payment Gateways & QR Code Configuration */}
       {activeTab === 'payments' && (
-        <form onSubmit={handleSavePayments} className="p-6 rounded-3xl bg-zinc-900 border border-zinc-800 space-y-6">
+        <form onSubmit={handleSavePayments} className="p-6 rounded-2xl bg-zinc-900 border border-zinc-800 space-y-6">
           <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
             <div>
               <h2 className="text-base font-bold text-white">Payment Gateways & QR Code Billing</h2>
@@ -1643,7 +1643,7 @@ export const AdminSettings: React.FC = () => {
 
       {/* TAB 3: Pending Approvals */}
       {activeTab === 'pending' && (
-        <div className="p-6 rounded-3xl bg-zinc-900 border border-zinc-800 space-y-4">
+        <div className="p-6 rounded-2xl bg-zinc-900 border border-zinc-800 space-y-4">
           <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
             <div>
               <h2 className="text-base font-bold text-white">Manual Payment Proofs Pending Approval</h2>
@@ -1712,7 +1712,7 @@ export const AdminSettings: React.FC = () => {
       {/* TAB 4: Updates & System Version */}
       {activeTab === 'updates' && (
         <div className="space-y-6">
-          <div className="p-6 rounded-3xl bg-zinc-900 border border-zinc-800 space-y-4">
+          <div className="p-6 rounded-2xl bg-zinc-900 border border-zinc-800 space-y-4">
             <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 border-b border-zinc-800 pb-4">
               <div>
                 <h2 className="text-base font-bold text-white flex items-center gap-2">
@@ -1789,7 +1789,7 @@ export const AdminSettings: React.FC = () => {
 
           {/* Active Update Execution Status */}
           {updateJob && updateJob.status !== 'idle' && (
-            <div className="p-6 rounded-3xl bg-zinc-900 border border-zinc-800 space-y-5">
+            <div className="p-6 rounded-2xl bg-zinc-900 border border-zinc-800 space-y-5">
               <div className="flex justify-between items-center border-b border-zinc-800 pb-3">
                 <div className="flex items-center gap-2">
                   <Terminal className="h-5 w-5 text-amber-400" />
@@ -1877,14 +1877,14 @@ export const AdminSettings: React.FC = () => {
       {activeTab === 'network_sftp' && (
         <div className="space-y-6">
           {fetchingNetwork ? (
-            <div className="flex flex-col items-center justify-center p-12 bg-zinc-900 border border-zinc-800 rounded-3xl space-y-3">
+            <div className="flex flex-col items-center justify-center p-12 bg-zinc-900 border border-zinc-800 rounded-2xl space-y-3">
               <Loader2 className="h-8 w-8 text-amber-500 animate-spin" />
               <p className="text-xs text-zinc-400">Performing real-time network and SFTP daemon diagnostics...</p>
             </div>
           ) : (
             <>
               {/* Core Status Header & Badges */}
-              <div className="p-6 rounded-3xl bg-zinc-900 border border-zinc-800 space-y-6">
+              <div className="p-6 rounded-2xl bg-zinc-900 border border-zinc-800 space-y-6">
                 <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 border-b border-zinc-800 pb-4">
                   <div>
                     <h2 className="text-base font-bold text-white flex items-center gap-2">
@@ -1955,14 +1955,14 @@ export const AdminSettings: React.FC = () => {
       {activeTab === 'network_protection' && (
         <div className="space-y-6">
           {loadingNetProtect ? (
-            <div className="flex flex-col items-center justify-center p-12 bg-zinc-900 border border-zinc-800 rounded-3xl space-y-3">
+            <div className="flex flex-col items-center justify-center p-12 bg-zinc-900 border border-zinc-800 rounded-2xl space-y-3">
               <Loader2 className="h-8 w-8 text-amber-500 animate-spin" />
               <p className="text-xs text-zinc-400">Probing host firewall capabilities and reconciling server port rules...</p>
             </div>
           ) : (
             <>
               {/* Header & Main Controls */}
-              <div className="p-6 rounded-3xl bg-zinc-900 border border-zinc-800 space-y-6">
+              <div className="p-6 rounded-2xl bg-zinc-900 border border-zinc-800 space-y-6">
                 <div className="flex flex-col md:flex-row justify-between md:items-center gap-4 border-b border-zinc-800 pb-4">
                   <div>
                     <h2 className="text-base font-bold text-white flex items-center gap-2">
@@ -2095,7 +2095,7 @@ export const AdminSettings: React.FC = () => {
               {/* Detailed Breakdown Panels */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {/* Panel 1: Dynamic Preserved Ports */}
-                <div className="p-6 rounded-3xl bg-zinc-900 border border-zinc-800 space-y-4">
+                <div className="p-6 rounded-2xl bg-zinc-900 border border-zinc-800 space-y-4">
                   <h3 className="text-sm font-bold text-white flex items-center gap-2 border-b border-zinc-800 pb-3">
                     <Key className="h-4 w-4 text-amber-400" /> Preserved System Ports
                   </h3>
@@ -2144,7 +2144,7 @@ export const AdminSettings: React.FC = () => {
                 </div>
 
                 {/* Panel 2: Host Environment */}
-                <div className="p-6 rounded-3xl bg-zinc-900 border border-zinc-800 space-y-4">
+                <div className="p-6 rounded-2xl bg-zinc-900 border border-zinc-800 space-y-4">
                   <h3 className="text-sm font-bold text-white flex items-center gap-2 border-b border-zinc-800 pb-3">
                     <Cpu className="h-4 w-4 text-amber-400" /> Host Environment & Privileges
                   </h3>
@@ -2179,7 +2179,7 @@ export const AdminSettings: React.FC = () => {
                 </div>
 
                 {/* Panel 3: Active Protections */}
-                <div className="p-6 rounded-3xl bg-zinc-900 border border-zinc-800 space-y-4">
+                <div className="p-6 rounded-2xl bg-zinc-900 border border-zinc-800 space-y-4">
                   <h3 className="text-sm font-bold text-white flex items-center gap-2 border-b border-zinc-800 pb-3">
                     <Lock className="h-4 w-4 text-amber-400" /> Security Rules & Pass-Through
                   </h3>
@@ -2224,7 +2224,7 @@ export const AdminSettings: React.FC = () => {
               </div>
 
               {/* Managed Server Port Registry */}
-              <div className="p-6 rounded-3xl bg-zinc-900 border border-zinc-800 space-y-4">
+              <div className="p-6 rounded-2xl bg-zinc-900 border border-zinc-800 space-y-4">
                 <div className="flex justify-between items-center border-b border-zinc-800 pb-3">
                   <div>
                     <h3 className="text-sm font-bold text-white flex items-center gap-2">
@@ -2284,7 +2284,7 @@ export const AdminSettings: React.FC = () => {
       {/* TAB 8: DATABASE HOSTS */}
       {activeTab === 'databases' && (
         <div className="space-y-6">
-          <div className="p-6 rounded-3xl bg-zinc-900 border border-zinc-800 space-y-4">
+          <div className="p-6 rounded-2xl bg-zinc-900 border border-zinc-800 space-y-4">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
               <div>
                 <h3 className="text-base font-bold text-white flex items-center gap-2">
@@ -2335,7 +2335,7 @@ export const AdminSettings: React.FC = () => {
               <p>Loading database host providers...</p>
             </div>
           ) : databaseHosts.length === 0 ? (
-            <div className="p-12 text-center rounded-3xl bg-zinc-900/40 border border-zinc-800 space-y-3">
+            <div className="p-12 text-center rounded-2xl bg-zinc-900/40 border border-zinc-800 space-y-3">
               <Database className="h-10 w-10 text-zinc-600 mx-auto" />
               <div className="text-sm font-semibold text-zinc-300">No Database Hosts Configured</div>
               <p className="text-xs text-zinc-500 max-w-md mx-auto">

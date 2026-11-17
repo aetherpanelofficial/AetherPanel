@@ -1911,8 +1911,6 @@ async function generateInitialDb(): Promise<DatabaseSchema> {
 
   const hostRamMB = Math.round(os.totalmem() / (1024 * 1024));
   const hostCpuCores = os.cpus()?.length || 4;
-  const hostName = os.hostname() || 'local-vps';
-
   const nodes: Node[] = [
     {
       id: 'local',
@@ -1936,7 +1934,7 @@ async function generateInitialDb(): Promise<DatabaseSchema> {
 
       // Compatibility fields
       ip: '127.0.0.1',
-      fqdn: process.env.NODE_FQDN || process.env.LOCAL_NODE_FQDN || hostName,
+      fqdn: process.env.NODE_FQDN || process.env.LOCAL_NODE_FQDN || undefined,
       daemonPort: 9666,
       sftpPort: 2022,
       location: 'local',

@@ -175,11 +175,11 @@ export const AdminBilling: React.FC = () => {
           <p>Loading order records...</p>
         </div>
       ) : filteredOrders.length === 0 ? (
-        <div className="p-12 text-center bg-zinc-900/60 border border-zinc-800 rounded-3xl text-xs text-zinc-400">
+        <div className="p-12 text-center bg-zinc-900/60 border border-zinc-800 rounded-2xl text-xs text-zinc-400">
           No matching order records found.
         </div>
       ) : (
-        <div className="rounded-3xl border border-zinc-800 bg-zinc-900/60 overflow-hidden shadow-xl">
+        <div className="rounded-2xl border border-zinc-800 bg-zinc-900/60 overflow-hidden shadow-xl">
           <table className="w-full text-left text-xs">
             <thead className="bg-zinc-950 border-b border-zinc-800 text-zinc-400 font-mono text-[11px]">
               <tr>

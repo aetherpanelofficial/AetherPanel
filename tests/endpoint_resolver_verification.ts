@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import os from 'node:os';
 import { resolveNodePublicEndpoint, resolveServerPublicEndpoint } from '../server/network/endpointResolver';
 import { Node, Server } from '../src/types';
 
@@ -19,5 +20,23 @@ assert.equal(resolveServerPublicEndpoint(server, node).endpoint, '203.0.113.9:25
 node.fqdn = 'play.example.test';
 assert.equal(resolveNodePublicEndpoint(node).host, 'play.example.test');
 assert.equal(resolveServerPublicEndpoint(server, node).endpoint, 'play.example.test:25565');
+
+const localNode: Partial<Node> = {
+  id: 'local',
+  isLocal: true,
+  fqdn: 'DESKTOP-V9NHBOD',
+  hostname: 'localhost',
+  ip: '127.0.0.1',
+  publicIpv4: '203.0.113.10'
+};
+const localEndpoint = resolveServerPublicEndpoint(server, localNode);
+assert.equal(localEndpoint.rawHost, os.hostname());
+assert.equal(localEndpoint.source, 'hostname');
+assert.equal(localEndpoint.isExternallyReachable, false);
+
+localNode.fqdn = 'play.panel.example.test';
+const configuredEndpoint = resolveServerPublicEndpoint(server, localNode);
+assert.equal(configuredEndpoint.rawHost, 'play.panel.example.test');
+assert.equal(configuredEndpoint.source, 'fqdn');
 
 console.log('Endpoint resolver cache and fallback verification passed.');

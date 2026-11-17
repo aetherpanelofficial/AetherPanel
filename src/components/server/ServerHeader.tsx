@@ -13,6 +13,7 @@ interface ServerHeaderProps {
   server: Server;
   isMinecraft: boolean;
   isPython: boolean;
+  endpointSource?: Server['endpointSource'];
   fullIp: string;
   copied: boolean;
   onCopy: (text: string) => void;
@@ -35,6 +36,7 @@ export const ServerHeader: React.FC<ServerHeaderProps> = ({
   server,
   isMinecraft,
   isPython,
+  endpointSource,
   fullIp,
   copied,
   onCopy,
@@ -196,6 +198,11 @@ export const ServerHeader: React.FC<ServerHeaderProps> = ({
                   {copied ? <Check className="h-3 w-3 text-[var(--color-ok)]" /> : <Copy className="h-3 w-3 text-[var(--color-ink-dim)]" />}
                 </button>
               ) : null}
+              {endpointSource && (
+                <span className="text-[11px] font-mono uppercase tracking-[0.06em] text-[var(--color-ink-mute)]" title="Source of the advertised node address">
+                  {endpointSource === 'fqdn' ? 'Configured FQDN' : endpointSource === 'hostname' ? 'OS hostname fallback' : 'Address fallback'}
+                </span>
+              )}
 
               {/* Location Tag */}
               <span className="text-[10px] font-mono text-neutral-400 flex items-center gap-1">

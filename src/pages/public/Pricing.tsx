@@ -82,7 +82,7 @@ export const Pricing: React.FC<PricingProps> = ({ onNavigate }) => {
           <button
             type="button"
             onClick={() => setBillingCycle(billingCycle === 'monthly' ? 'yearly' : 'monthly')}
-            className="w-9 h-5 rounded-full bg-[var(--color-surface-2)] border border-[var(--color-line)] p-0.5 flex items-center cursor-pointer"
+            className="toggle-switch w-9 h-5 bg-[var(--color-surface-2)] border border-[var(--color-line)] p-0.5 flex items-center cursor-pointer"
           >
             <div className={`h-3.5 w-3.5 rounded-full bg-[var(--color-accent)] transition-transform ${billingCycle === 'yearly' ? 'translate-x-4' : ''}`} />
           </button>

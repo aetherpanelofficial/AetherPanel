@@ -130,7 +130,7 @@ export function isValidIPv6(ip?: string | null): boolean {
 
 export interface PublicEndpointResult {
   endpoint: string;
-  source: 'fqdn' | 'public_ipv4' | 'public_ipv6' | 'node_ip';
+  source: 'fqdn' | 'hostname' | 'public_ipv4' | 'public_ipv6' | 'node_ip';
   port: number;
   isExternallyReachable: boolean;
   rawHost: string;
@@ -165,7 +165,7 @@ function cacheEndpoint<T extends object>(cache: Map<string, T>, key: string, val
 
 /**
  * Resolves the external connection address for a server (Pterodactyl style):
- * Priority: Node FQDN > Node Public IPv4 > Node IP > Server Primary IP > '127.0.0.1'
+ * Priority: configured FQDN > local OS hostname > Node Public IPv4 > Node IP > Server Primary IP.
  */
 export function resolveServerPublicEndpoint(
   server: Partial<Server>,
@@ -174,6 +174,7 @@ export function resolveServerPublicEndpoint(
   const port = (server as any).port || server.primaryPort || 25565;
   const cacheKey = JSON.stringify([
     port,
+    node?.isLocal,
     node?.fqdn,
     node?.publicIpv4,
     node?.ip,
@@ -186,7 +187,7 @@ export function resolveServerPublicEndpoint(
 
   // 1. Node explicit FQDN (Highest priority: DNS domain configured for player connections)
   const nodeFqdn = (node?.fqdn || '').trim();
-  if (nodeFqdn && nodeFqdn !== 'localhost' && nodeFqdn !== '127.0.0.1' && nodeFqdn !== '0.0.0.0' && !nodeFqdn.endsWith('.local') && nodeFqdn !== 'local-vps') {
+  if (isValidFQDN(nodeFqdn)) {
     return cache({
       endpoint: `${nodeFqdn}:${port}`,
       rawHost: nodeFqdn,
@@ -196,8 +197,19 @@ export function resolveServerPublicEndpoint(
     });
   }
 
-  // Without a configured FQDN, use the node's IP instead of guessing a domain.
   const nodeHostname = (node?.hostname || '').trim();
+  const isLocalNode = node?.isLocal === true || node?.isLocalNode === true;
+  const hostnameFallback = isLocalNode ? os.hostname().trim() : '';
+  if (hostnameFallback) {
+    return cache({
+      endpoint: `${hostnameFallback}:${port}`,
+      rawHost: hostnameFallback,
+      source: 'hostname',
+      port,
+      isExternallyReachable: false
+    });
+  }
+
   // 2. Node Public IPv4
   if (node?.publicIpv4 && node.publicIpv4.trim()) {
     const rawHost = node.publicIpv4.trim();

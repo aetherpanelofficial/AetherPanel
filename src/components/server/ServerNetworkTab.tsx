@@ -201,7 +201,7 @@ export const ServerNetworkTab: React.FC<ServerNetworkTabProps> = ({ server, onRe
   };
 
   const primaryAlloc = networkData?.allocations.find(a => a.id === networkData.primaryAllocationId) || networkData?.allocations[0];
-  const primaryHost = networkData?.node.fqdn || networkData?.node.publicIpv4 || (networkData?.node.ip !== '0.0.0.0' ? networkData?.node.ip : '127.0.0.1') || '127.0.0.1';
+  const primaryHost = server.primaryIp || networkData?.node.fqdn || networkData?.node.publicIpv4 || (networkData?.node.ip !== '0.0.0.0' ? networkData?.node.ip : '127.0.0.1') || '127.0.0.1';
   const primaryEndpoint = primaryAlloc ? `${primaryHost}:${primaryAlloc.port}` : `${primaryHost}:${(server as any).port || server.primaryPort || 25565}`;
 
   return (
@@ -226,13 +226,13 @@ export const ServerNetworkTab: React.FC<ServerNetworkTabProps> = ({ server, onRe
               <span>Connection Address</span>
             </h2>
             <p className="text-xs text-[var(--color-ink-mute)]">
-              Direct connection address routed through your node's assigned network interface.
+              Client connection address on the node's assigned port. {server.endpointSource === 'fqdn' ? 'Using the configured FQDN.' : server.endpointSource === 'hostname' ? 'Using the OS hostname fallback; configure a node FQDN for a public domain.' : 'Using the available address fallback.'}
             </p>
           </div>
 
           <div className="flex items-center gap-2 w-full md:w-auto">
             <div className="px-3 py-1.5 rounded-md bg-[var(--color-surface-2)] border border-[var(--color-line)] text-xs font-mono text-[var(--color-ink)] flex items-center gap-3 w-full md:w-auto justify-between">
-              <span className="select-all font-semibold text-[var(--color-accent)]">{primaryEndpoint}</span>
+              <span className="select-all font-semibold text-[var(--color-ink)] tabular-nums">{primaryEndpoint}</span>
               <button
                 type="button"
                 onClick={() => copyToClipboard(primaryEndpoint, 'primary_endpoint')}
@@ -311,7 +311,7 @@ export const ServerNetworkTab: React.FC<ServerNetworkTabProps> = ({ server, onRe
                     <div>
                       <div className="flex items-center gap-2">
                         <span className="font-mono text-xs font-semibold text-[var(--color-ink)]">
-                          {alloc.ip}:{alloc.port}
+                          {primaryHost}:{alloc.port}
                         </span>
                         {isPrimary && (
                           <span className="badge badge-accent">
@@ -437,7 +437,7 @@ export const ServerNetworkTab: React.FC<ServerNetworkTabProps> = ({ server, onRe
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {/* Host */}
             <div className="p-3 rounded-lg bg-[var(--color-surface-2)] border border-[var(--color-line)] space-y-1">
-              <span className="label block">Server Address</span>
+              <span className="label block">Server Address · {server.endpointSource === 'fqdn' ? 'Configured FQDN' : server.endpointSource === 'hostname' ? 'OS hostname fallback' : 'Address fallback'}</span>
               <div className="flex items-center justify-between font-mono text-xs font-semibold text-[var(--color-ink)]">
                 <span className="truncate">{sftpInfo?.host || primaryHost}</span>
                 <button

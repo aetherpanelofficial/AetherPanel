@@ -110,7 +110,7 @@ export const Login: React.FC<LoginProps> = ({ onNavigate }) => {
         </div>
 
         {/* Card */}
-        <div className="rounded-xl border-0 bg-[var(--color-surface-1)] p-8 shadow-[var(--shadow-2)] space-y-4">
+        <div className="auth-card rounded-3xl border-0 bg-[var(--color-surface-1)] p-8 shadow-[var(--shadow-2)] space-y-4">
           {error && (
             <div className="p-3 rounded-md bg-[var(--color-err)]/10 border border-[var(--color-err)]/30 text-xs text-[var(--color-err)] flex flex-col gap-1.5" role="alert">
               <div className="flex items-start gap-2">

@@ -211,7 +211,7 @@ export const ServersList: React.FC<ServersListProps> = ({ onNavigate }) => {
                         <div
                           onClick={(e) => handleCopy(e, fullAddress, server.id)}
                           className="inline-flex items-center gap-1.5 font-mono text-xs text-neutral-300 hover:text-white transition-colors cursor-pointer"
-                          title="Click to copy address"
+                          title={`Click to copy address. ${server.endpointSource === 'fqdn' ? 'Configured FQDN' : server.endpointSource === 'hostname' ? 'OS hostname fallback' : 'Address fallback'}.`}
                         >
                           <span>{fullAddress}</span>
                           {copiedId === server.id ? (
@@ -219,6 +219,9 @@ export const ServersList: React.FC<ServersListProps> = ({ onNavigate }) => {
                           ) : (
                             <Copy className="h-3 w-3 text-neutral-400 opacity-60 hover:opacity-100 shrink-0" />
                           )}
+                        </div>
+                        <div className="mt-1 text-[10px] font-mono text-[var(--color-ink-mute)]">
+                          {server.endpointSource === 'fqdn' ? 'Configured FQDN' : server.endpointSource === 'hostname' ? 'OS hostname fallback' : 'Address fallback'}
                         </div>
                       </td>
 

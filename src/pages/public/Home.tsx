@@ -8,7 +8,7 @@ import { useBranding } from '../../lib/BrandingContext';
 import { apiRequest } from '../../lib/api';
 import { Plan, Product } from '../../types';
 import { Marquee } from '../../components/ui/Marquee';
-import { RotatingHero } from '../../components/home/RotatingHero';
+import { DEFAULT_HERO_SLIDES, RotatingHero } from '../../components/home/RotatingHero';
 
 interface HomeProps {
   onNavigate: (page: string, params?: any) => void;
@@ -60,6 +60,19 @@ export const Home: React.FC<HomeProps> = ({ onNavigate }) => {
   const [currencySymbol, setCurrencySymbol] = useState<string>('€');
   const [faqs, setFaqs] = useState<any[]>([]);
   const [openFaqId, setOpenFaqId] = useState<string | null>(null);
+  const configuredHeroImages = (homepageConfig.heroBackgroundImages || [])
+    .map(image => image.trim().replace(/^\/src\/assets\//, '/'))
+    .filter(Boolean);
+  const hasCategoryImages = configuredHeroImages.some(image => /bot|runtime|discord|minecraft|steve/i.test(image));
+  const heroSlides = DEFAULT_HERO_SLIDES.map((slide, index) => {
+    const categoryImage = configuredHeroImages.find(image =>
+      slide.category === 'bot'
+        ? /bot|runtime|discord/i.test(image)
+        : /minecraft|steve/i.test(image)
+    );
+    const configuredImage = categoryImage || (!hasCategoryImages ? configuredHeroImages[index] : undefined);
+    return configuredImage ? { ...slide, bgImage: configuredImage } : slide;
+  });
 
   useEffect(() => {
     const loadData = async () => {
@@ -274,6 +287,8 @@ export const Home: React.FC<HomeProps> = ({ onNavigate }) => {
       ───────────────────────────────────────────────────────────────────────────── */}
       <section className="relative w-full">
         <RotatingHero
+          customSlides={heroSlides}
+          intervalMs={(Number(homepageConfig.heroSlideDelaySeconds) || 6) * 1000}
           onNavigate={onNavigate}
           onSelectCategory={(cat) => {
             if (cat === 'minecraft') setActiveCategoryTab('minecraft');

@@ -114,7 +114,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
             <div className="w-[600px] h-[600px] bg-rose-600/5 rounded-full blur-[140px]" />
           </div>
 
-          <div className="max-w-2xl w-full bg-zinc-900/90 backdrop-blur-xl border border-rose-500/20 shadow-2xl rounded-3xl p-6 sm:p-8 space-y-6 relative z-10">
+          <div className="max-w-2xl w-full bg-zinc-900/90 backdrop-blur-xl border border-rose-500/20 shadow-2xl rounded-2xl p-6 sm:p-8 space-y-6 relative z-10">
             {/* Header / Tracker Badge */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-zinc-800/80">
               <div className="flex items-center gap-3">

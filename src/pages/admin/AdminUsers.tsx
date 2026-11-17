@@ -278,7 +278,7 @@ export const AdminUsers: React.FC = () => {
       ) : filtered.length === 0 ? (
         <div className="p-12 text-center text-zinc-500 text-xs">No users matching search query.</div>
       ) : (
-        <div className="overflow-x-auto rounded-3xl border border-zinc-800 bg-zinc-900/60 backdrop-blur-xl">
+        <div className="overflow-x-auto rounded-2xl border border-zinc-800 bg-zinc-900/60 backdrop-blur-xl">
           <table className="w-full text-left text-xs text-zinc-300">
             <thead className="border-b border-zinc-800 bg-zinc-950/80 text-[11px] font-mono uppercase text-zinc-400">
               <tr>

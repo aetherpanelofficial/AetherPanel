@@ -367,7 +367,7 @@ export const CryptoPaymentModal: React.FC<CryptoPaymentModalProps> = ({
 
               {/* Amount & QR Details Card */}
               {invoice.status !== 'paid' ? (
-                <div className="p-6 rounded-3xl bg-zinc-900/90 border border-zinc-800 grid grid-cols-1 md:grid-cols-12 gap-6 items-center shadow-md">
+                <div className="p-6 rounded-2xl bg-zinc-900/90 border border-zinc-800 grid grid-cols-1 md:grid-cols-12 gap-6 items-center shadow-md">
                   {/* QR Code */}
                   <div className="md:col-span-5 flex flex-col items-center justify-center p-3.5 bg-white rounded-2xl shadow-xl border border-zinc-200 space-y-2.5">
                     <img
@@ -428,7 +428,7 @@ export const CryptoPaymentModal: React.FC<CryptoPaymentModalProps> = ({
                 </div>
               ) : (
                 /* Paid / Activated Celebration Panel */
-                <div className="p-6 rounded-3xl bg-emerald-500/5 border border-emerald-500/20 text-center space-y-4 animate-scale-up">
+                <div className="p-6 rounded-2xl bg-emerald-500/5 border border-emerald-500/20 text-center space-y-4 animate-scale-up">
                   <div className="w-16 h-16 mx-auto rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shadow-[0_0_25px_rgba(16,185,129,0.2)]">
                     <Sparkles className="w-8 h-8 animate-bounce text-emerald-400" />
                   </div>

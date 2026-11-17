@@ -555,7 +555,7 @@ export const ServerStartupTab: React.FC<ServerStartupTabProps> = ({ server, onRe
                         onClick={() =>
                           handleVariableChange(variable.key, variable.value === '1' ? '0' : '1')
                         }
-                        className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                        className={`toggle-switch relative inline-flex h-6 w-11 shrink-0 cursor-pointer border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
                           variable.value === '1' ? 'bg-[#f97316]' : 'bg-[#23252e]'
                         }`}
                       >

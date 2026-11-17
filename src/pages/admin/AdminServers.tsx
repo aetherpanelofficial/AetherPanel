@@ -570,7 +570,7 @@ export const AdminServers: React.FC = () => {
           <span>Loading server containers...</span>
         </div>
       ) : (
-        <div className="rounded-3xl border border-zinc-800 bg-zinc-900/60 overflow-hidden overflow-x-auto">
+        <div className="rounded-2xl border border-zinc-800 bg-zinc-900/60 overflow-hidden overflow-x-auto">
           <table className="w-full text-left text-xs min-w-[700px]">
             <thead className="bg-zinc-950 border-b border-zinc-800 text-zinc-400 font-mono text-[11px]">
               <tr>

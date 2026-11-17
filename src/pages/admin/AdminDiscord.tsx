@@ -388,7 +388,7 @@ export const AdminDiscord: React.FC = () => {
               </div>
             </div>
           )}
-          <form onSubmit={handleSaveSettings} className="p-6 rounded-3xl bg-zinc-900 border border-zinc-800 space-y-6">
+          <form onSubmit={handleSaveSettings} className="p-6 rounded-2xl bg-zinc-900 border border-zinc-800 space-y-6">
             <div className="flex items-center justify-between border-b border-zinc-800 pb-4">
               <div>
                 <h3 className="text-sm font-bold text-white flex items-center gap-2">
@@ -574,7 +574,7 @@ export const AdminDiscord: React.FC = () => {
       {/* TAB 2: 11-STEP ACCEPTANCE TEST SUITE */}
       {activeTab === 'tests' && (
         <div className="space-y-6">
-          <div className="p-6 rounded-3xl bg-zinc-900 border border-zinc-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="p-6 rounded-2xl bg-zinc-900 border border-zinc-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
               <h3 className="text-base font-bold text-white flex items-center gap-2">
                 <CheckCircle2 className="h-5 w-5 text-emerald-400" /> Automated Discord Acceptance Test Runner
@@ -654,7 +654,7 @@ export const AdminDiscord: React.FC = () => {
               ))}
             </div>
           ) : (
-            <div className="p-12 text-center text-xs text-zinc-500 border border-dashed border-zinc-800 rounded-3xl space-y-3">
+            <div className="p-12 text-center text-xs text-zinc-500 border border-dashed border-zinc-800 rounded-2xl space-y-3">
               <CheckCircle2 className="h-8 w-8 text-zinc-600 mx-auto" />
               <div>
                 <p className="font-semibold text-zinc-400">No test run recorded in current session</p>
@@ -667,7 +667,7 @@ export const AdminDiscord: React.FC = () => {
 
       {/* TAB 3: AUDIT LOGS */}
       {activeTab === 'logs' && (
-        <div className="p-6 rounded-3xl bg-zinc-900 border border-zinc-800 space-y-4">
+        <div className="p-6 rounded-2xl bg-zinc-900 border border-zinc-800 space-y-4">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-zinc-800 pb-4">
             <div>
               <h3 className="text-base font-bold text-white flex items-center gap-2">

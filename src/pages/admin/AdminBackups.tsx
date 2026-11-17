@@ -189,7 +189,7 @@ export const AdminBackups: React.FC<AdminBackupsProps> = ({ onNavigate }) => {
       </div>
 
       {/* Global Storage & Retention Policy Form */}
-      <form onSubmit={handleSaveSettings} className="p-6 rounded-3xl bg-zinc-900 border border-zinc-800 space-y-6">
+      <form onSubmit={handleSaveSettings} className="p-6 rounded-2xl bg-zinc-900 border border-zinc-800 space-y-6">
         <div className="flex items-center justify-between border-b border-zinc-800 pb-4">
           <div>
             <h2 className="text-lg font-bold text-white flex items-center gap-2">
@@ -306,7 +306,7 @@ export const AdminBackups: React.FC<AdminBackupsProps> = ({ onNavigate }) => {
       </form>
 
       {/* System Backups Table */}
-      <div className="p-6 rounded-3xl bg-zinc-900 border border-zinc-800 space-y-4">
+      <div className="p-6 rounded-2xl bg-zinc-900 border border-zinc-800 space-y-4">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
             <h2 className="text-lg font-bold text-white">All System Backups</h2>

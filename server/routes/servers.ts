@@ -149,6 +149,7 @@ router.get('/', authMiddleware, requireApiKeyScope('servers:read'), async (req: 
         ...srv,
         primaryIp: ep.rawHost,
         resolvedPublicEndpoint: ep.endpoint,
+        endpointSource: ep.source,
         serverType: resolveServerType(srv, db.serverTypes || []),
         isSubuser: false
       };
@@ -166,6 +167,7 @@ router.get('/', authMiddleware, requireApiKeyScope('servers:read'), async (req: 
         ...srv,
         primaryIp: ep.rawHost,
         resolvedPublicEndpoint: ep.endpoint,
+        endpointSource: ep.source,
         serverType: resolveServerType(srv, db.serverTypes || []),
         isSubuser: true,
         permissions: subuserEntry ? subuserEntry.permissions : [],

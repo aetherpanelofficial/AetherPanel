@@ -85,7 +85,7 @@ export const UtrVerificationInput: React.FC<UtrVerificationInputProps> = ({
   };
 
   return (
-    <div className="p-6 rounded-3xl bg-zinc-950 border border-violet-500/30 shadow-2xl space-y-5 text-zinc-100 relative overflow-hidden">
+    <div className="p-6 rounded-2xl bg-zinc-950 border border-violet-500/30 shadow-2xl space-y-5 text-zinc-100 relative overflow-hidden">
       {/* Top Subtle Purple Ambient Glow */}
       <div className="absolute top-0 right-0 w-48 h-48 bg-violet-500/10 rounded-full blur-3xl pointer-events-none" />
 

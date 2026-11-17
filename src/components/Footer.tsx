@@ -32,8 +32,8 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
 
   return (
     <footer id="platform_footer" className="border-t border-[var(--color-line)] bg-[var(--color-bg)] text-[var(--color-ink-dim)] select-none">
-      <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
+      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-9 lg:px-8">
+        <div className="mb-6 grid grid-cols-1 gap-x-10 gap-y-7 sm:grid-cols-2 lg:grid-cols-[1.15fr_1fr_1fr_1fr]">
           
           {/* Col 1: Brand & Socials */}
           <div className="space-y-3 md:col-span-1">
@@ -237,7 +237,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
         </div>
 
         {/* Bottom Bar */}
-        <div className="pt-6 border-t border-[var(--color-line)] flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-[var(--color-ink-mute)]">
+        <div className="flex flex-col items-start justify-between gap-3 border-t border-[var(--color-line)] pt-5 text-xs text-[var(--color-ink-mute)] sm:flex-row sm:items-center">
           <div className="flex flex-wrap items-center gap-3">
             <span>© 2025–2026 AetherPanel. All rights reserved.</span>
             <span className="hidden sm:inline text-[var(--color-line)]">|</span>

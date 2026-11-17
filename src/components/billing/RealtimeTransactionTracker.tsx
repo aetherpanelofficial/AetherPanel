@@ -23,7 +23,7 @@ export const RealtimeTransactionTracker: React.FC<RealtimeTransactionTrackerProp
 
   if (!invoice) {
     return (
-      <div className="p-6 rounded-3xl bg-zinc-950/80 border border-amber-500/20 text-center space-y-3 relative overflow-hidden">
+      <div className="p-6 rounded-2xl bg-zinc-950/80 border border-amber-500/20 text-center space-y-3 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full blur-2xl pointer-events-none" />
         <div className="w-12 h-12 mx-auto rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
           <Activity className="w-6 h-6 animate-pulse" />
@@ -78,7 +78,7 @@ export const RealtimeTransactionTracker: React.FC<RealtimeTransactionTrackerProp
   };
 
   return (
-    <div className="p-6 rounded-3xl bg-gradient-to-b from-zinc-900/90 to-zinc-950/95 border border-amber-500/30 shadow-2xl space-y-6 relative overflow-hidden">
+    <div className="p-6 rounded-2xl bg-gradient-to-b from-zinc-900/90 to-zinc-950/95 border border-amber-500/30 shadow-2xl space-y-6 relative overflow-hidden">
       {/* Gold Ambient Background Glow */}
       <div className="absolute -top-20 -right-20 w-64 h-64 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
 
